@@ -1,0 +1,149 @@
+import { router } from 'expo-router';
+import React from 'react';
+import { Alert, Pressable, View } from 'react-native';
+import {
+  ActionButton,
+  AppScaffold,
+  AppText,
+  EmptyState,
+  ProgressBar,
+  Screen,
+  SectionTitle,
+  Surface,
+  ui,
+  usePalette,
+} from '@/components/app-ui';
+import { allowanceProgress, formatMoney } from '@/finance.mjs';
+import { Goal, useFinance } from '@/store';
+
+export default function GoalsScreen() {
+  const p = usePalette();
+  const { goals, preferences, removeGoal } = useFinance();
+
+  const totalSaved = goals.reduce((sum, g) => sum + g.savedMinor, 0);
+  const totalTarget = goals.reduce((sum, g) => sum + g.targetMinor, 0);
+  const completedCount = goals.filter((g) => g.savedMinor >= g.targetMinor).length;
+
+  const confirmDelete = (goal: Goal) => {
+    Alert.alert(
+      'Remove this goal?',
+      `“${goal.name}” will be removed. Stored progress will not be recovered.`,
+      [
+        { text: 'Keep goal', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            void removeGoal(goal.id);
+          },
+        },
+      ]
+    );
+  };
+
+  return (
+    <AppScaffold>
+      <Screen
+        eyebrow="For something that matters to you"
+        title="Savings goals"
+        action={
+          <Pressable
+            onPress={() => router.push('/goal-create')}
+            accessibilityRole="button"
+            accessibilityLabel="Create a new savings goal"
+            hitSlop={8}
+          >
+            <AppText variant="bodyMedium" weight="600" color={p.accent}>
+              + New goal
+            </AppText>
+          </Pressable>
+        }
+      >
+        {goals.length ? (
+          <>
+            {/* Overview Banner */}
+            <Surface style={{ padding: 20, backgroundColor: p.accentSoft, borderColor: p.accentSoft, gap: 6 }}>
+              <AppText variant="eyebrow" color={p.accent}>
+                SAVINGS PROGRESS
+              </AppText>
+              <AppText variant="title" weight="700" tabular>
+                {formatMoney(totalSaved, preferences.currency)} saved
+              </AppText>
+              <AppText variant="caption" color={p.textSecondary}>
+                across {goals.length} {goals.length === 1 ? 'goal' : 'goals'} · {completedCount} reached
+                {totalTarget > 0 ? ` of ${formatMoney(totalTarget, preferences.currency)} total targets` : ''}
+              </AppText>
+            </Surface>
+
+            <SectionTitle title="Your targets" detail="Small, steady contributions add up" />
+
+            {goals.map((goal) => {
+              const progress = allowanceProgress(goal.savedMinor, goal.targetMinor);
+              const isComplete = goal.savedMinor >= goal.targetMinor;
+
+              return (
+                <Surface key={goal.id} style={{ padding: 18, gap: 14 }}>
+                  <View style={[ui.row, { justifyContent: 'space-between' }]}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <AppText variant="headline">{goal.name}</AppText>
+                      <AppText variant="caption" color={p.textSecondary} tabular>
+                        {formatMoney(goal.savedMinor, preferences.currency)} of{' '}
+                        {formatMoney(goal.targetMinor, preferences.currency)}
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="headline"
+                      color={isComplete ? p.accent : p.text}
+                      tabular
+                    >
+                      {Math.round(progress * 100)}%
+                    </AppText>
+                  </View>
+
+                  <ProgressBar value={progress} color={isComplete ? p.accent : p.accent} height={8} />
+
+                  <View style={[ui.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                    {isComplete ? (
+                      <AppText variant="captionMedium" color={p.accent}>
+                        Target reached. Nicely done!
+                      </AppText>
+                    ) : (
+                      <ActionButton
+                        label="Add savings"
+                        variant="quiet"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/goal-add',
+                            params: { id: goal.id.toString() },
+                          })
+                        }
+                      />
+                    )}
+
+                    <Pressable
+                      onPress={() => confirmDelete(goal)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete goal ${goal.name}`}
+                      hitSlop={8}
+                    >
+                      <AppText variant="caption" color={p.textSecondary}>
+                        Delete
+                      </AppText>
+                    </Pressable>
+                  </View>
+                </Surface>
+              );
+            })}
+          </>
+        ) : (
+          <EmptyState
+            title="Give a future plan a name"
+            detail="A trip home, a laptop, a buffer for exam season. Saving can be small, steady, and entirely at your own pace."
+            cta="Create your first goal"
+            onPress={() => router.push('/goal-create')}
+          />
+        )}
+      </Screen>
+    </AppScaffold>
+  );
+}

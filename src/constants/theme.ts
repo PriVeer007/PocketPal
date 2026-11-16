@@ -1,65 +1,143 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://unistyl.es/), etc.
- */
-
 import '@/global.css';
+import { Platform, TextStyle } from 'react-native';
 
-import { Platform } from 'react-native';
+export type ThemeMode = 'light' | 'dark';
 
-export const Colors = {
+export type ColorPalette = {
+  text: string;
+  background: string;
+  backgroundElement: string;
+  backgroundSelected: string;
+  textSecondary: string;
+  accent: string;
+  accentSoft: string;
+  border: string;
+  warning: string;
+  chartGrid: string;
+  chartBar: string;
+  chartBarSecondary: string;
+};
+
+export const Colors: Record<ThemeMode, ColorPalette> = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#18201C',
+    background: '#F6F5F0',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#EAECE6',
+    textSecondary: '#56645E',
+    accent: '#1B4D41',
+    accentSoft: '#DEEAE3',
+    border: '#DFE3DC',
+    warning: '#9E4D2B',
+    chartGrid: '#E7EBE4',
+    chartBar: '#215A4C',
+    chartBarSecondary: '#94B4A9',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#E5ECE7',
+    background: '#131614',
+    backgroundElement: '#1B1F1C',
+    backgroundSelected: '#242A25',
+    textSecondary: '#859188',
+    accent: '#4A9A7C',
+    accentSoft: '#1D2A23',
+    border: '#272E29',
+    warning: '#C47857',
+    chartGrid: '#1D241F',
+    chartBar: '#4A9A7C',
+    chartBarSecondary: '#2B4237',
   },
-} as const;
+};
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type ThemeColor = keyof ColorPalette;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+    sans: 'System',
+    serif: 'Georgia',
+    mono: 'Courier New',
   },
-  default: {
-    sans: 'normal',
+  android: {
+    sans: 'Roboto',
     serif: 'serif',
-    rounded: 'normal',
     mono: 'monospace',
   },
   web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
+    sans: 'var(--font-display), system-ui, -apple-system, sans-serif',
+    serif: 'var(--font-serif), Georgia, serif',
+    mono: 'var(--font-mono), monospace',
+  },
+  default: {
+    sans: 'System',
+    serif: 'serif',
+    mono: 'monospace',
   },
 });
 
-export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+export const Typography = {
+  display: {
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '700' as TextStyle['fontWeight'],
+    letterSpacing: -0.8,
+  },
+  titleLarge: {
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '700' as TextStyle['fontWeight'],
+    letterSpacing: -0.5,
+  },
+  title: {
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '600' as TextStyle['fontWeight'],
+    letterSpacing: -0.4,
+  },
+  headline: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '600' as TextStyle['fontWeight'],
+    letterSpacing: -0.2,
+  },
+  body: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '400' as TextStyle['fontWeight'],
+    letterSpacing: -0.1,
+  },
+  bodyMedium: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500' as TextStyle['fontWeight'],
+    letterSpacing: -0.1,
+  },
+  caption: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '400' as TextStyle['fontWeight'],
+    letterSpacing: 0,
+  },
+  captionMedium: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600' as TextStyle['fontWeight'],
+    letterSpacing: 0,
+  },
+  eyebrow: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '700' as TextStyle['fontWeight'],
+    letterSpacing: 1.2,
+  },
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+export const Spacing = {
+  two: 2,
+  four: 4,
+  eight: 8,
+  twelve: 12,
+  sixteen: 16,
+  twenty: 20,
+  twentyFour: 24,
+  thirtyTwo: 32,
+} as const;

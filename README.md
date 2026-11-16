@@ -1,56 +1,41 @@
-# Welcome to your Expo app 👋
+# Pennywise
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Pennywise is an offline-first allowance and spending companion for college students. It keeps everyday expenses, category limits, and savings goals on the device and works without an account or bank connection.
 
-## Get started
+## Start the app
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Use `a` in the Expo terminal to open the Android emulator, or scan the development QR code with Expo Go. A development build is needed for native packages that Expo Go does not include; the app currently uses Expo SQLite, which is included in Expo Go for SDK 58.
 
-### Other setup steps
+## Product areas
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- First-run setup for student name, currency, allowance amount, and cycle start day.
+- Dashboard with cycle remainder, spending pace, optional category budgets, and recent entries.
+- One-step expense entry with optional behavioural reflection and a note.
+- Searchable, filterable activity with confirmed deletion.
+- Current-cycle category insights and non-judgemental reflection summaries.
+- Savings goals with locally recorded contributions.
+- Profile, allowance, category budget, and adaptive light/dark settings.
 
-## Learn more
+See [PRODUCT-DESIGN.md](./PRODUCT-DESIGN.md) for the screen-by-screen specification and interaction rules.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Local data and money
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The app stores its SQLite database in the device's application data directory as `pennywise.db`. Versioned schema migrations create tables for preferences, expenses, goals, and category budgets. All user values go through parameterized SQL statements. Records stay on the device; this MVP does not sync or back up data.
 
-## Join the community
+Money uses integer currency minor units and the selected currency's fraction digits. Expense timestamps are stored as ISO instants and grouped using the device's local calendar. The allowance cycle supports start days 1 through 28 to avoid short-month edge cases.
 
-Join our community of developers creating universal apps.
+## Checks
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```sh
+npm run typecheck
+npm test
+npm run lint
+npx expo export --platform android --output-dir .expo/export-android
+```
+
+The calculation tests use Node's built-in test runner and cover currency minor units and formatting, date and cycle boundaries, allowance totals and progress, daily spend trends, category breakdowns, and expense validation.
