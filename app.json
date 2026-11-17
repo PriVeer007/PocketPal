@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "Pennywise",
-    "slug": "pennywise",
-    "version": "1.0.0",
+    "name": "PocketPal",
+    "slug": "pocketpal",
+    "version": "1.2.31",
     "orientation": "portrait",
-    "icon": "./assets/images/pennywise-icon.png",
-    "scheme": "pennywise",
+    "icon": "./assets/images/pocketpal-icon.png",
+    "scheme": "pocketpal",
     "userInterfaceStyle": "automatic",
     "android": {
-      "package": "com.pennywise.studentbudget",
+      "package": "com.pocketpal.studentbudget",
       "adaptiveIcon": {
         "backgroundColor": "#173D34",
-        "foregroundImage": "./assets/images/pennywise-foreground.png",
-        "monochromeImage": "./assets/images/pennywise-monochrome.png"
+        "foregroundImage": "./assets/images/pocketpal-foreground.png",
+        "monochromeImage": "./assets/images/pocketpal-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "server",
-      "favicon": "./assets/images/pennywise-favicon.png"
+      "favicon": "./assets/images/pocketpal-favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -26,7 +26,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#255C4F",
-          "image": "./assets/images/pennywise-mark.png",
+          "image": "./assets/images/pocketpal-mark.png",
           "imageWidth": 108
         }
       ],
@@ -43,8 +43,9 @@
         }
       },
       "eas": {
-        "projectId": "817d9e56-96fc-4953-b819-e0429f4708c9"
+        "projectId": "c3cd0e86-7955-463a-90bf-2cef883d5da3"
       }
-    }
+    },
+    "owner": "priveer"
   }
 }

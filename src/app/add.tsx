@@ -18,20 +18,23 @@ import {
   useAccentForeground,
   usePalette,
 } from '@/components/app-ui';
-import { toMinorUnits, validateExpense } from '@/finance.mjs';
+import { localDateKey, toMinorUnits, validateExpense } from '@/finance.mjs';
 import { CATEGORIES, Category, Reflection, useFinance } from '@/store';
 
 const reflections: readonly Reflection[] = ['Planned', 'Spontaneous', 'Needed', 'Just wanted it'] as const;
 
 type EntryMode = 'expense' | 'income';
+const INCOME_SOURCES = ['Allowance', 'Scholarship', 'Part-time work', 'Freelance', 'Other'] as const;
 
 export default function AddExpenseScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
-  const { preferences, addExpense, addIncome } = useFinance();
+  const { preferences, addExpense, addIncome, logZeroSpendDay } = useFinance();
   const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const submitLock = useRef(false);
 
   const [entryMode, setEntryMode] = useState<EntryMode>('expense');
+  const [incomeSource, setIncomeSource] = useState<(typeof INCOME_SOURCES)[number]>('Allowance');
   const [amount, setAmount] = useState('');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<Category>('Food');
@@ -56,12 +59,13 @@ export default function AddExpenseScreen() {
         setError('Add a short description of the income source.');
         return;
       }
+      if (submitLock.current) return;
+      submitLock.current = true;
       setSaving(true);
       try {
         const minor = toMinorUnits(numericAmount, preferences.currency);
         if (!minor) {
           setError('Enter a valid amount.');
-          setSaving(false);
           return;
         }
         const incomeDate = new Date();
@@ -71,7 +75,7 @@ export default function AddExpenseScreen() {
         await addIncome({
           amountMinor: minor,
           title: title.trim().slice(0, 80),
-          source: category,
+          source: incomeSource,
           occurredAt: incomeDate.toISOString(),
           note: note.trim().slice(0, 160) || null,
         });
@@ -79,6 +83,7 @@ export default function AddExpenseScreen() {
       } catch {
         setError('Your entry could not be saved. Please try again.');
       } finally {
+        submitLock.current = false;
         setSaving(false);
       }
       return;
@@ -86,24 +91,20 @@ export default function AddExpenseScreen() {
 
     // Zero-log for streak maintenance
     if (isZeroLog) {
+      if (submitLock.current) return;
+      submitLock.current = true;
       setSaving(true);
       try {
         const spendDate = new Date();
         if (dateOffset > 0) {
           spendDate.setDate(spendDate.getDate() - dateOffset);
         }
-        await addExpense({
-          amountMinor: 1, // minimal 1 paisa / cent to satisfy DB constraint
-          title: 'Zero-spend day (streak log)',
-          category: 'Other',
-          occurredAt: spendDate.toISOString(),
-          reflection: null,
-          note: 'Logged to maintain daily streak without spending.',
-        });
+        await logZeroSpendDay(localDateKey(spendDate));
         router.back();
       } catch {
         setError('Could not log your zero-spend day.');
       } finally {
+        submitLock.current = false;
         setSaving(false);
       }
       return;
@@ -122,12 +123,13 @@ export default function AddExpenseScreen() {
       return;
     }
 
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSaving(true);
     try {
       const minor = toMinorUnits(numericAmount, preferences.currency);
       if (!minor) {
         setError('Enter a valid amount.');
-        setSaving(false);
         return;
       }
 
@@ -148,6 +150,7 @@ export default function AddExpenseScreen() {
     } catch {
       setError('Your entry could not be saved. Please try again.');
     } finally {
+      submitLock.current = false;
       setSaving(false);
     }
   };
@@ -356,12 +359,15 @@ export default function AddExpenseScreen() {
                   {entryMode === 'income' ? 'Source type' : 'Category'}
                 </AppText>
                 <View style={styles.categoryRow}>
-                  {CATEGORIES.map((cat) => {
-                    const active = category === cat;
+                  {(entryMode === 'income' ? INCOME_SOURCES : CATEGORIES).map((option) => {
+                    const active = entryMode === 'income' ? incomeSource === option : category === option;
                     return (
                       <Pressable
-                        key={cat}
-                        onPress={() => setCategory(cat)}
+                        key={option}
+                        onPress={() => {
+                          if (entryMode === 'income') setIncomeSource(option as (typeof INCOME_SOURCES)[number]);
+                          else setCategory(option as Category);
+                        }}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
                         style={[
@@ -372,13 +378,13 @@ export default function AddExpenseScreen() {
                           },
                         ]}
                       >
-                        <CategoryMark category={cat} size={28} />
+                        {entryMode === 'expense' ? <CategoryMark category={option} size={28} /> : null}
                         <AppText
                           variant="captionMedium"
                           weight={active ? '600' : '500'}
                           color={active ? p.accent : p.text}
                         >
-                          {cat}
+                          {option}
                         </AppText>
                       </Pressable>
                     );

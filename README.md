@@ -1,6 +1,6 @@
-# Pennywise
+# PocketPal
 
-Pennywise is an offline-first allowance and spending companion for college students. It keeps everyday expenses, category limits, and savings goals on the device and works without an account or bank connection.
+PocketPal is a behavioural approach to student budget management. It keeps everyday expenses, category limits, and savings goals on the device and works without an account or bank connection.
 
 ## Start the app
 
@@ -25,7 +25,7 @@ See [PRODUCT-DESIGN.md](./PRODUCT-DESIGN.md) for the screen-by-screen specificat
 
 ## Local data and money
 
-The app stores its SQLite database in the device's application data directory as `pennywise.db`. Versioned schema migrations create tables for preferences, expenses, goals, and category budgets. All user values go through parameterized SQL statements. Records stay on the device; this MVP does not sync or back up data.
+The app stores its SQLite database in the device's application data directory as `pocketpal.db`. Versioned schema migrations create tables for preferences, expenses, goals, and category budgets. All user values go through parameterized SQL statements. Records stay on the device; this MVP does not sync or back up data.
 
 Money uses integer currency minor units and the selected currency's fraction digits. Expense timestamps are stored as ISO instants and grouped using the device's local calendar. The allowance cycle supports start days 1 through 28 to avoid short-month edge cases.
 

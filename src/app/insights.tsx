@@ -5,6 +5,7 @@ import {
   AppScaffold,
   AppText,
   CategoryBreakdownList,
+  CategoryDonut,
   DailySpendTrendChart,
   ExpenseCalendarHeatmap,
   ProgressBar,
@@ -17,6 +18,7 @@ import {
 } from '@/components/app-ui';
 import {
   categoryBreakdown,
+  categoryColor,
   cycleStart,
   dailySpendTrend,
   formatMoney,
@@ -256,29 +258,18 @@ export default function InsightsScreen() {
               {breakdown.length > 0 ? (
                 <View style={[ui.row, { gap: 20, alignItems: 'center' }]}>
                   {/* Circular Total Indicator (Donut style) */}
-                  <View
-                    style={{
-                      width: 110,
-                      height: 110,
-                      borderRadius: 55,
-                      borderWidth: 10,
-                      borderColor: p.accent,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: p.backgroundElement,
-                    }}
-                  >
+                  <CategoryDonut segments={breakdown} size={110}>
                     <AppText variant="captionMedium" weight="700" tabular size={13}>
                       {formatMoney(totalSpent, preferences.currency)}
                     </AppText>
                     <AppText variant="caption" color={p.textSecondary} size={11} tabular>
                       ~{formatMoney(dailyAverage, preferences.currency)}/d
                     </AppText>
-                  </View>
+                  </CategoryDonut>
 
                   {/* Category percentage list */}
                   <View style={{ flex: 1, gap: 10 }}>
-                    {breakdown.slice(0, 4).map((item) => (
+                    {breakdown.map((item) => (
                       <View key={item.category} style={[ui.row, { justifyContent: 'space-between' }]}>
                         <View style={[ui.row, { gap: 8 }]}>
                           <View
@@ -286,7 +277,7 @@ export default function InsightsScreen() {
                               width: 8,
                               height: 8,
                               borderRadius: 4,
-                              backgroundColor: p.accent,
+                              backgroundColor: categoryColor(item.category),
                             }}
                           />
                           <AppText variant="captionMedium" weight="600">
@@ -347,7 +338,7 @@ export default function InsightsScreen() {
             <Surface style={{ padding: 18, gap: 12 }}>
               <AppText variant="headline">Mindful vs. Impulse Spending</AppText>
               <AppText variant="body" color={p.textSecondary}>
-                Pennywise encourages noticing how purchases feel without guilt.
+                PocketPal encourages noticing how purchases feel without guilt.
               </AppText>
 
               <ProgressBar value={mindfulStats.percentage / 100} height={10} color={p.accent} />

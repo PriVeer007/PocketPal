@@ -1,4 +1,6 @@
 :root {
+  --pocketpal-loading-background: #F6F5F0;
+  --pocketpal-loading-accent: #1B4D41;
   --font-display:
     Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
     Segoe UI Symbol, Noto Color Emoji;
@@ -6,4 +8,11 @@
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pocketpal-loading-background: #131614;
+    --pocketpal-loading-accent: #4A9A7C;
+  }
 }

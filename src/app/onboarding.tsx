@@ -81,7 +81,7 @@ export default function OnboardingScreen() {
 
           <View style={{ gap: 4 }}>
             <AppText variant="eyebrow" color={p.accent}>
-              PENNYWISE · STUDENT FINANCE
+              POCKETPAL · STUDENT FINANCE
             </AppText>
             <AppText variant="display" size={32} style={{ lineHeight: 38 }}>
               Make your money work for student life.

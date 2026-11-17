@@ -2,22 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   allowanceProgress,
+  applyGoalBalanceChange,
+  buildActivityRecords,
+  calculateBudgetSummary,
   calculateDailyPace,
   calculateLoggingStreak,
   categoryBreakdown,
+  categoryColor,
   currencyDigits,
   cycleStart,
   dailySpendTrend,
   formatMoney,
   generateBackupJSON,
   generateExpensesCSV,
+  goalLedgerSummary,
   localDateKey,
   monthCalendarData,
   monthlySpendTrend,
   nextCycleStart,
+  reconcileGoalBalances,
   remainingAllowance,
   sumExpenses,
   toMinorUnits,
+  validateBackupPayload,
   validateExpense,
   weeklySpendTrend,
 } from './finance.mjs';
@@ -114,6 +121,10 @@ test('computes logging streaks correctly', () => {
   const aliveStreak = calculateLoggingStreak(expenses, refTomorrow);
   assert.equal(aliveStreak.currentStreak, 3);
   assert.equal(aliveStreak.loggedToday, false);
+
+  const zeroSpendStreak = calculateLoggingStreak([], new Date(2026, 10, 17), ['2026-11-16', '2026-11-17']);
+  assert.equal(zeroSpendStreak.loggedToday, true);
+  assert.equal(zeroSpendStreak.currentStreak, 2);
 });
 
 test('generates calendar heatmap data and identifies zero spend days', () => {
@@ -130,7 +141,16 @@ test('generates calendar heatmap data and identifies zero spend days', () => {
   assert.equal(cal.totalSpentMinor, 550);
 });
 
-test('generates CSV and JSON backup strings properly', () => {
+test('summarizes savings ledger activity and includes it in backups', () => {
+  const summary = goalLedgerSummary([
+    { kind: 'deposit', amountMinor: 25000 },
+    { kind: 'deposit', amountMinor: 5000 },
+    { kind: 'withdrawal', amountMinor: 6000 },
+  ]);
+  assert.equal(summary.depositsMinor, 30000);
+  assert.equal(summary.withdrawalsMinor, 6000);
+  assert.equal(summary.netMinor, 24000);
+
   const expenses = [
     { id: 1, occurredAt: '2026-11-10T12:00:00.000Z', title: 'Lunch "Special"', category: 'Food', amountMinor: 15000, reflection: 'Planned', note: 'With friends' },
   ];
@@ -138,9 +158,119 @@ test('generates CSV and JSON backup strings properly', () => {
   assert.match(csv, /"Lunch ""Special"""/);
   assert.match(csv, /150\.00/);
 
-  const json = generateBackupJSON({ name: 'Alex' }, expenses, [], {});
-  assert.match(json, /Pennywise/);
+  const zeroSpendDays = ['2026-11-09'];
+  const incomes = [{ id: 1, amountMinor: 25000, title: 'Freelance', source: 'Client', occurredAt: '2026-11-08T10:00:00.000Z', note: null }];
+  const goalTransactions = [{ id: 1, goalId: 42, kind: 'deposit', amountMinor: 25000, occurredAt: '2026-11-08T10:00:00.000Z', note: null }];
+  const goals = [{ id: 42, name: 'Books', targetMinor: 50000, savedMinor: 25000, createdAt: '2026-11-01T10:00:00.000Z', deletedAt: null }];
+  const json = generateBackupJSON({ name: 'Alex' }, expenses, goals, {}, zeroSpendDays, incomes, goalTransactions);
+  assert.match(json, /PocketPal/);
   assert.match(json, /"name": "Alex"/);
+  assert.match(json, /"zeroSpendDays": \[\s*"2026-11-09"/s);
+  assert.match(json, /"incomes": \[/);
+  assert.match(json, /"goalTransactions": \[/);
+
+  const parsed = JSON.parse(json);
+  const validated = validateBackupPayload(parsed);
+  assert.equal(validated.goalTransactionCount, 1);
+  assert.doesNotThrow(() => validateBackupPayload(parsed));
+  assert.throws(() => validateBackupPayload({ app: 'Wrong' }), /Invalid PocketPal backup file/);
+});
+
+test('reconciles goal balances from ledger entries instead of cached balances', () => {
+  const goals = [
+    { id: 1, savedMinor: 1000 },
+    { id: 2, savedMinor: 2000 },
+  ];
+  const goalTransactions = [
+    { goalId: 1, kind: 'deposit', amountMinor: 1500 },
+    { goalId: 1, kind: 'withdrawal', amountMinor: 250 },
+    { goalId: 2, kind: 'deposit', amountMinor: 800 },
+    { goalId: 2, kind: 'withdrawal', amountMinor: 100 },
+  ];
+
+  const balances = reconcileGoalBalances(goals, goalTransactions);
+  assert.equal(balances[1], 1250);
+  assert.equal(balances[2], 700);
+  assert.equal(Object.keys(balances).length, 2);
+});
+
+test('savings allocation and withdrawal update available budget by the exact amounts', () => {
+  const allowanceMinor = 1000000;
+  const expenseMinor = 200000;
+  const depositMinor = 50000;
+  const withdrawalMinor = 20000;
+
+  const afterDeposit = applyGoalBalanceChange(0, 'deposit', depositMinor, 1000000);
+  assert.equal(afterDeposit, 50000);
+  const afterDepositSummary = calculateBudgetSummary({
+    allowanceMinor,
+    expenseMinor,
+    savingsReservedMinor: afterDeposit,
+  });
+  assert.equal(afterDepositSummary.availableMinor, 750000);
+  assert.equal(afterDepositSummary.expenseMinor, expenseMinor);
+
+  const afterWithdrawal = applyGoalBalanceChange(afterDeposit, 'withdrawal', withdrawalMinor);
+  assert.equal(afterWithdrawal, 30000);
+  const afterWithdrawalSummary = calculateBudgetSummary({
+    allowanceMinor,
+    expenseMinor,
+    savingsReservedMinor: afterWithdrawal,
+  });
+  assert.equal(afterWithdrawalSummary.availableMinor, 770000);
+  assert.equal(afterWithdrawalSummary.expenseMinor, expenseMinor);
+  assert.throws(() => applyGoalBalanceChange(afterWithdrawal, 'withdrawal', 30001), /exceeds the current balance/);
+  assert.throws(() => applyGoalBalanceChange(0, 'deposit', 100001, 100000), /exceed the goal target/);
+  assert.throws(() => applyGoalBalanceChange(afterWithdrawal, 'withdrawal', 0), /valid savings amount/);
+
+  const persistedBalance = reconcileGoalBalances(
+    [{ id: 1, savedMinor: afterWithdrawal }],
+    [
+      { id: 1, goalId: 1, kind: 'deposit', amountMinor: depositMinor },
+      { id: 2, goalId: 1, kind: 'withdrawal', amountMinor: withdrawalMinor },
+    ]
+  );
+  assert.equal(persistedBalance[1], afterWithdrawal);
+});
+
+test('builds one shared activity history for expenses, income, savings, and goal closures', () => {
+  const records = buildActivityRecords({
+    expenses: [
+      { id: 1, title: 'Lunch', amountMinor: 2000, occurredAt: '2026-11-03T12:00:00.000Z', category: 'Food', reflection: 'Planned', note: null },
+    ],
+    incomes: [
+      { id: 1, title: 'Allowance', amountMinor: 50000, occurredAt: '2026-11-03T11:00:00.000Z', source: 'Family allowance', note: null },
+    ],
+    goals: [{ id: 7, name: 'Books' }],
+    goalTransactions: [
+      { id: 1, goalId: 7, kind: 'deposit', amountMinor: 10000, occurredAt: '2026-11-03T10:00:00.000Z', note: null },
+      { id: 2, goalId: 7, kind: 'withdrawal', amountMinor: 5000, occurredAt: '2026-11-03T09:00:00.000Z', note: null },
+      { id: 3, goalId: 7, kind: 'withdrawal', amountMinor: 5000, occurredAt: '2026-11-03T08:00:00.000Z', note: 'Goal closed: Books' },
+    ],
+  });
+
+  assert.equal(records.length, 5);
+  assert.equal(new Set(records.map((record) => record.key)).size, records.length);
+  assert.equal(records[0].type, 'expense');
+  assert.equal(records.find((record) => record.type === 'income').amountMinor, 50000);
+  assert.equal(records.find((record) => record.type === 'savingsAllocation').goalName, 'Books');
+  assert.equal(records.find((record) => record.type === 'goalClosure').type, 'goalClosure');
+  assert.equal(dailySpendTrend([{ amountMinor: 2000, occurredAt: '2026-11-03T12:00:00.000Z' }], '2026-11-03', '2026-11-03')[0].amountMinor, 2000);
+});
+
+test('uses consistent distinct colors for primary and custom categories', () => {
+  assert.equal(categoryColor('Food'), '#1DB954');
+  assert.equal(categoryColor('Social'), '#9B72CF');
+  assert.equal(categoryColor('Transport'), '#4285F4');
+  assert.equal(categoryColor('Study'), '#F4B942');
+  assert.equal(categoryColor('Other'), '#F06C62');
+  assert.equal(categoryColor('Others'), '#F06C62');
+  assert.equal(categoryColor('Shopping'), '#22A6A1');
+
+  const customColor = categoryColor('Campus supplies');
+  assert.equal(customColor, categoryColor('Campus supplies'));
+  assert.match(customColor, /^#[0-9A-F]{6}$/);
+  assert.equal(new Set(['#1DB954', '#9B72CF', '#4285F4', '#F4B942', '#F06C62', '#22A6A1']).has(customColor), false);
 });
 
 test('calculates adaptive rollover vs fixed daily pacing', () => {
@@ -177,6 +307,22 @@ test('calculates adaptive rollover vs fixed daily pacing', () => {
     pacingMode: 'fixed',
   });
   assert.equal(fixed.dailyRoomMinor, 30000);
+
+  const summary = calculateBudgetSummary({
+    allowanceMinor: 900000,
+    incomeMinor: 200000,
+    expenseMinor: 250000,
+    savingsReservedMinor: 100000,
+    withdrawalsMinor: 15000,
+    totalCycleDays: 30,
+    daysLeft: 12,
+    pacingMode: 'adaptive',
+    zeroSpendDays: ['2026-11-09', '2026-11-10'],
+  });
+  assert.equal(summary.availableMinor, 765000);
+  assert.equal(summary.remainingMinor, 765000);
+  assert.equal(summary.zeroSpendDays, 2);
+  assert.equal(summary.dailyRoomMinor, 63750);
 });
 
 test('validates quick expense fields and keeps reflection optional', () => {
@@ -198,4 +344,51 @@ test('computes weekly and monthly spend trends', () => {
   const monthly = monthlySpendTrend(expenses, '2026-10-01', '2026-11-30');
   assert.equal(monthly.length, 2);
   assert.equal(monthly[1].amountMinor, 5000);
+});
+
+test('rejects invalid savings backups and preserves ledger summary integrity', () => {
+  const summary = goalLedgerSummary([
+    { kind: 'deposit', amountMinor: 1200 },
+    { kind: 'withdrawal', amountMinor: 300 },
+    { kind: 'deposit', amountMinor: 50 },
+  ]);
+  assert.equal(summary.netMinor, 950);
+
+  assert.throws(() => validateBackupPayload({ app: 'PocketPal', goalTransactions: 'bad' }), /Invalid PocketPal backup file/);
+  assert.throws(() => validateBackupPayload({ app: 'PocketPal', goalTransactions: [{ goalId: 1 }] }), /Invalid PocketPal backup file/);
+  assert.throws(() => validateBackupPayload({ app: 'PocketPal', goalTransactions: [{ goalId: 1, kind: 'deposit', amountMinor: 0 }] }), /Invalid PocketPal backup file/);
+
+  const goal = { id: 1, name: 'Books', targetMinor: 10000, savedMinor: 1000 };
+  const transaction = { id: 1, goalId: 1, kind: 'deposit', amountMinor: 1000, occurredAt: '2026-11-01T10:00:00.000Z' };
+  assert.doesNotThrow(() => validateBackupPayload({ app: 'PocketPal', goals: [goal], goalTransactions: [transaction] }));
+  assert.doesNotThrow(() => validateBackupPayload({ app: 'PocketPal', goals: [goal] }));
+  assert.doesNotThrow(() => validateBackupPayload({
+    app: 'PocketPal',
+    goals: [{ ...goal, savedMinor: 500 }],
+    goalTransactions: [
+      { id: 2, goalId: 1, kind: 'withdrawal', amountMinor: 500, occurredAt: '2026-11-02T10:00:00.000Z' },
+      { id: 1, goalId: 1, kind: 'deposit', amountMinor: 1000, occurredAt: '2026-11-01T10:00:00.000Z' },
+    ],
+  }));
+  assert.throws(() => validateBackupPayload({ app: 'PocketPal', goalTransactions: [] }), /Invalid PocketPal backup file/);
+  assert.throws(
+    () => validateBackupPayload({ app: 'PocketPal', goals: [goal], goalTransactions: [{ ...transaction, amountMinor: 999 }] }),
+    /Invalid PocketPal backup file/
+  );
+  assert.throws(
+    () => validateBackupPayload({ app: 'PocketPal', goals: [goal], goalTransactions: [transaction, transaction] }),
+    /Invalid PocketPal backup file/
+  );
+  assert.throws(
+    () => validateBackupPayload({ app: 'PocketPal', goals: [goal], goalTransactions: [{ ...transaction, goalId: 2 }] }),
+    /Invalid PocketPal backup file/
+  );
+  assert.throws(
+    () => validateBackupPayload({
+      app: 'PocketPal',
+      goals: [{ ...goal, savedMinor: 0 }],
+      goalTransactions: [transaction, { ...transaction, id: 2, kind: 'withdrawal', amountMinor: 1001 }],
+    }),
+    /Invalid PocketPal backup file/
+  );
 });

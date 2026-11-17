@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import {
@@ -27,7 +28,7 @@ function formatMinorToInput(minor: number, currency: string) {
 export default function ProfileScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
-  const { preferences, expenses, goals, budgets, savePreferences, saveBudget, resetAllData } = useFinance();
+  const { preferences, expenses, incomes, goals, goalRecords, goalTransactions, budgets, zeroSpendDays, savePreferences, saveBudget, resetAllData } = useFinance();
 
   const [name, setName] = useState(preferences.name);
   const [allowance, setAllowance] = useState(formatMinorToInput(preferences.allowanceMinor, preferences.currency));
@@ -45,7 +46,7 @@ export default function ProfileScreen() {
     try {
       const csv = generateExpensesCSV(expenses, preferences.currency);
       await Share.share({
-        title: 'Pennywise Expenses Export',
+        title: 'PocketPal Expenses Export',
         message: csv,
       });
       setNotice('Expense CSV ready to share.');
@@ -56,9 +57,9 @@ export default function ProfileScreen() {
 
   const exportJSON = async () => {
     try {
-      const backup = generateBackupJSON(preferences, expenses, goals, budgets);
+      const backup = generateBackupJSON(preferences, expenses, goalRecords, budgets, zeroSpendDays, incomes, goalTransactions);
       await Share.share({
-        title: 'Pennywise SQLite Backup',
+        title: 'PocketPal SQLite Backup',
         message: backup,
       });
       setNotice('Database backup ready to save.');
@@ -70,7 +71,7 @@ export default function ProfileScreen() {
   const handleResetAllData = () => {
     Alert.alert(
       'Reset all data?',
-      'All local SQLite records (expenses, goals, and budgets) will be permanently cleared from this device.',
+      'All local SQLite records (expenses, incomes, zero-spend days, goals, and budgets) will be permanently cleared from this device.',
       [
         { text: 'Keep my data', style: 'cancel' },
         {
@@ -456,7 +457,7 @@ export default function ProfileScreen() {
 
         {/* About Section */}
         <View style={{ gap: 12 }}>
-          <SectionTitle title="About Pennywise" detail="Created for mindful student finance" />
+          <SectionTitle title="About PocketPal" detail="Created for mindful student finance" />
           <Surface style={{ padding: 18, gap: 12 }}>
             <View style={[ui.row, { gap: 10 }]}>
               <View
@@ -474,9 +475,9 @@ export default function ProfileScreen() {
                 </AppText>
               </View>
               <View style={{ flex: 1 }}>
-                <AppText variant="headline">Pennywise</AppText>
+                <AppText variant="headline">PocketPal</AppText>
                 <AppText variant="caption" color={p.textSecondary}>
-                  Version 1.0.0 · Offline Edition
+                  Version 1.2.16 · Offline Edition
                 </AppText>
               </View>
             </View>
@@ -488,7 +489,13 @@ export default function ProfileScreen() {
                 DEVELOPMENT TEAM
               </AppText>
               <AppText variant="title" weight="700">
-                Built by Team DTI Players
+                Team PocketPal
+              </AppText>
+              <AppText variant="captionMedium" color={p.text}>
+                Frontend by Raj Tivari
+              </AppText>
+              <AppText variant="captionMedium" color={p.text}>
+                Backend by Prithvi Veeresh
               </AppText>
               <AppText variant="body" color={p.textSecondary}>
                 Engineered with dedication to help college students navigate allowance cycles, build savings habits, and make everyday spending visible without judgment or cloud tracking.
@@ -552,6 +559,14 @@ export default function ProfileScreen() {
               }}
             />
 
+            <ActionButton
+              label="Restore from JSON backup"
+              variant="quiet"
+              onPress={() => {
+                router.push('/restore');
+              }}
+            />
+
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginVertical: 4 }} />
 
             <View style={{ gap: 4 }}>
@@ -568,8 +583,8 @@ export default function ProfileScreen() {
         <Surface style={{ padding: 16, gap: 4 }}>
           <AppText variant="headline">Private by design</AppText>
           <AppText variant="body" color={p.textSecondary}>
-            {expenses.length} {expenses.length === 1 ? 'expense' : 'expenses'} and {goals.length}{' '}
-            {goals.length === 1 ? 'goal are' : 'goals are'} stored in SQLite directly on this device. Pennywise does not connect to banks, cloud services, or external trackers.
+            {expenses.length} {expenses.length === 1 ? 'expense' : 'expenses'} and             {goals.length}{' '}
+            {goals.length === 1 ? 'goal is' : 'goals are'} active in SQLite directly on this device. PocketPal does not connect to banks, cloud services, or external trackers.
           </AppText>
         </Surface>
       </Screen>

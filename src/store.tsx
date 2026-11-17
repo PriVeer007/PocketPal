@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { SQLiteDatabase, SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
+import { applyGoalBalanceChange, generateBackupJSON, reconcileGoalBalances, validateBackupPayload } from '@/finance.mjs';
 
 export type Category = 'Food' | 'Transport' | 'Study' | 'Social' | 'Shopping' | 'Other';
 export type Reflection = 'Planned' | 'Spontaneous' | 'Needed' | 'Just wanted it';
@@ -26,6 +27,19 @@ export type Goal = {
   targetMinor: number;
   savedMinor: number;
   createdAt: string;
+  deletedAt: string | null;
+};
+export type GoalTransaction = {
+  id: number;
+  goalId: number;
+  kind: 'deposit' | 'withdrawal';
+  amountMinor: number;
+  occurredAt: string;
+  note: string | null;
+};
+export type ZeroSpendDay = {
+  dateKey: string;
+  createdAt: string;
 };
 export type PacingMode = 'adaptive' | 'fixed';
 export type Preferences = {
@@ -39,6 +53,15 @@ export type Preferences = {
 };
 
 export const CATEGORIES: readonly Category[] = ['Food', 'Transport', 'Study', 'Social', 'Shopping', 'Other'] as const;
+
+async function getGoalLedgerBalance(db: SQLiteDatabase, goalId: number) {
+  const result = await db.getFirstAsync<{ balance_minor: number }>(
+    `SELECT COALESCE(SUM(CASE WHEN kind = 'deposit' THEN amount_minor ELSE -amount_minor END), 0) AS balance_minor
+     FROM goal_transactions WHERE goal_id = ?`,
+    goalId
+  );
+  return Number(result?.balance_minor ?? 0);
+}
 
 const DEFAULT_PREFERENCES: Preferences = {
   name: '',
@@ -132,6 +155,115 @@ export async function migrateDatabase(db: SQLiteDatabase) {
       `);
     });
   }
+
+  const v4Result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  if ((v4Result?.user_version ?? 0) < 4) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS zero_spend_days (
+          date_key TEXT PRIMARY KEY NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (4, datetime('now'));
+        PRAGMA user_version = 4;
+      `);
+    });
+  }
+
+  const v5Result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  if ((v5Result?.user_version ?? 0) < 5) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS goal_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          goal_id INTEGER NOT NULL,
+          kind TEXT NOT NULL CHECK (kind IN ('deposit', 'withdrawal')),
+          amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+          occurred_at TEXT NOT NULL,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY(goal_id) REFERENCES goals(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS goal_transactions_goal_idx ON goal_transactions(goal_id, occurred_at);
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, datetime('now'));
+        PRAGMA user_version = 5;
+      `);
+    });
+  }
+
+  const v6Result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  if ((v6Result?.user_version ?? 0) < 6) {
+    await db.withTransactionAsync(async () => {
+      try {
+        await db.execAsync('ALTER TABLE goals ADD COLUMN deleted_at TEXT');
+      } catch {
+        // already present on newer databases
+      }
+      await db.execAsync(`
+        UPDATE goals SET deleted_at = NULL WHERE deleted_at IS NULL;
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (6, datetime('now'));
+        PRAGMA user_version = 6;
+      `);
+    });
+  }
+
+  const v7Result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  if ((v7Result?.user_version ?? 0) < 7) {
+    await db.withTransactionAsync(async () => {
+      const goals = await db.getAllAsync<{
+        id: number;
+        saved_minor: number;
+        target_minor: number;
+        ledger_balance: number;
+        transaction_count: number;
+      }>(`
+        SELECT
+          g.id,
+          g.saved_minor,
+          g.target_minor,
+          COALESCE(SUM(CASE WHEN t.kind = 'deposit' THEN t.amount_minor ELSE -t.amount_minor END), 0) AS ledger_balance,
+          COUNT(t.id) AS transaction_count
+        FROM goals g
+        LEFT JOIN goal_transactions t ON t.goal_id = g.id
+        GROUP BY g.id
+      `);
+      const reconciledAt = new Date().toISOString();
+      for (const goal of goals) {
+        const difference = goal.saved_minor - goal.ledger_balance;
+        if (difference === 0) continue;
+        if (!Number.isSafeInteger(goal.saved_minor) || goal.saved_minor < 0 || goal.saved_minor > goal.target_minor) {
+          throw new Error('A saved goal balance is invalid; the database migration was not applied.');
+        }
+        await db.runAsync(
+          'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          goal.id,
+          difference > 0 ? 'deposit' : 'withdrawal',
+          Math.abs(difference),
+          reconciledAt,
+          goal.transaction_count === 0
+            ? 'Opening balance carried forward during ledger migration'
+            : 'Balance reconciliation adjustment during ledger migration',
+          reconciledAt
+        );
+      }
+      const invalidGoal = await db.getFirstAsync<{ id: number }>(`
+        SELECT g.id
+        FROM goals g
+        LEFT JOIN goal_transactions t ON t.goal_id = g.id
+        GROUP BY g.id
+        HAVING g.saved_minor != COALESCE(SUM(CASE WHEN t.kind = 'deposit' THEN t.amount_minor ELSE -t.amount_minor END), 0)
+          OR g.saved_minor > g.target_minor
+        LIMIT 1
+      `);
+      if (invalidGoal) {
+        throw new Error('A savings ledger could not be reconciled; the database migration was not applied.');
+      }
+      await db.execAsync(`
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (7, datetime('now'));
+        PRAGMA user_version = 7;
+      `);
+    });
+  }
 }
 
 export type ExpenseInput = Omit<Expense, 'id'>;
@@ -145,7 +277,10 @@ type Store = {
   expenses: Expense[];
   incomes: Income[];
   goals: Goal[];
+  goalRecords: Goal[];
+  goalTransactions: GoalTransaction[];
   budgets: Record<string, number>;
+  zeroSpendDays: string[];
   savePreferences: (p: Partial<Preferences>) => Promise<void>;
   addExpense: (e: ExpenseInput) => Promise<void>;
   updateExpense: (e: Expense) => Promise<void>;
@@ -155,8 +290,11 @@ type Store = {
   saveGoal: (name: string, targetMinor: number) => Promise<void>;
   updateGoal: (id: number, name: string, targetMinor: number) => Promise<void>;
   addToGoal: (id: number, amountMinor: number) => Promise<void>;
+  withdrawFromGoal: (id: number, amountMinor: number) => Promise<void>;
   removeGoal: (id: number) => Promise<void>;
   saveBudget: (category: string, amountMinor: number) => Promise<void>;
+  logZeroSpendDay: (dateKey: string) => Promise<void>;
+  removeZeroSpendDay: (dateKey: string) => Promise<void>;
   resetAllData: () => Promise<void>;
   restoreBackup: (jsonString: string) => Promise<void>;
 };
@@ -165,7 +303,7 @@ const StoreContext = createContext<Store | null>(null);
 
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   return (
-    <SQLiteProvider databaseName="pennywise.db" onInit={migrateDatabase} useSuspense>
+    <SQLiteProvider databaseName="pocketpal.db" onInit={migrateDatabase} useSuspense>
       <FinanceProvider>{children}</FinanceProvider>
     </SQLiteProvider>
   );
@@ -179,11 +317,15 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalRecords, setGoalRecords] = useState<Goal[]>([]);
+  const [goalTransactions, setGoalTransactions] = useState<GoalTransaction[]>([]);
+  const goalOperationLocks = useRef(new Set<number>());
   const [budgets, setBudgets] = useState<Record<string, number>>({});
+  const [zeroSpendDays, setZeroSpendDays] = useState<string[]>([]);
 
   const refresh = useCallback(async () => {
     try {
-      const [pref, rows, incomeRows, goalRows, budgetRows] = await Promise.all([
+      const [pref, rows, incomeRows, goalRows, goalTxRows, budgetRows, zeroRows] = await Promise.all([
         db.getFirstAsync<{
           name: string;
           currency: string;
@@ -216,8 +358,18 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
           target_minor: number;
           saved_minor: number;
           created_at: string;
-        }>('SELECT id, name, target_minor, saved_minor, created_at FROM goals ORDER BY created_at DESC, id DESC'),
+          deleted_at: string | null;
+        }>('SELECT id, name, target_minor, saved_minor, created_at, deleted_at FROM goals ORDER BY created_at DESC, id DESC'),
+        db.getAllAsync<{
+          id: number;
+          goal_id: number;
+          kind: 'deposit' | 'withdrawal';
+          amount_minor: number;
+          occurred_at: string;
+          note: string | null;
+        }>('SELECT id, goal_id, kind, amount_minor, occurred_at, note FROM goal_transactions ORDER BY occurred_at DESC, id DESC'),
         db.getAllAsync<{ category: string; amount_minor: number }>('SELECT category, amount_minor FROM category_budgets'),
+        db.getAllAsync<{ date_key: string; created_at: string }>('SELECT date_key, created_at FROM zero_spend_days ORDER BY date_key DESC'),
       ]);
 
       if (pref) {
@@ -252,16 +404,32 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
           note: r.note,
         }))
       );
-      setGoals(
-        goalRows.map((r) => ({
+      const loadedGoalTransactions = goalTxRows.map((r) => ({
+        id: r.id,
+        goalId: r.goal_id,
+        kind: r.kind,
+        amountMinor: r.amount_minor,
+        occurredAt: r.occurred_at,
+        note: r.note,
+      }));
+      const loadedGoals = goalRows.map((r) => ({
           id: r.id,
           name: r.name,
           targetMinor: r.target_minor,
           savedMinor: r.saved_minor,
           createdAt: r.created_at,
-        }))
-      );
+          deletedAt: r.deleted_at,
+        }));
+      const ledgerBalances = reconcileGoalBalances(loadedGoals, loadedGoalTransactions);
+      const reconciledGoals = loadedGoals.map((goal) => ({
+        ...goal,
+        savedMinor: ledgerBalances[goal.id] ?? 0,
+      }));
+      setGoalRecords(reconciledGoals);
+      setGoals(reconciledGoals.filter((goal) => goal.deletedAt === null));
+      setGoalTransactions(loadedGoalTransactions);
       setBudgets(Object.fromEntries(budgetRows.map((r) => [r.category, r.amount_minor])));
+      setZeroSpendDays(zeroRows.map((r) => r.date_key).sort((a, b) => b.localeCompare(a)));
       setError(null);
       setReady(true);
     } catch (err) {
@@ -390,40 +558,199 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         0,
         createdAt
       );
-      setGoals((current) => [
-        { id: result.lastInsertRowId, name: name.trim(), targetMinor, savedMinor: 0, createdAt },
-        ...current,
-      ]);
+      const goal = { id: result.lastInsertRowId, name: name.trim(), targetMinor, savedMinor: 0, createdAt, deletedAt: null };
+      setGoals((current) => [goal, ...current]);
+      setGoalRecords((current) => [goal, ...current]);
     },
     [db]
   );
 
   const updateGoal = useCallback(
     async (id: number, name: string, targetMinor: number) => {
-      await db.runAsync('UPDATE goals SET name=?, target_minor=? WHERE id=?', name.trim(), targetMinor, id);
-      setGoals((current) =>
-        current.map((g) => (g.id === id ? { ...g, name: name.trim(), targetMinor } : g))
-      );
+      let savedMinor = 0;
+      await db.withTransactionAsync(async () => {
+        const row = await db.getFirstAsync<{ deleted_at: string | null }>(
+          'SELECT deleted_at FROM goals WHERE id=?',
+          id
+        );
+        if (!row || row.deleted_at !== null) {
+          throw new Error('This goal no longer exists.');
+        }
+        savedMinor = await getGoalLedgerBalance(db, id);
+        if (!Number.isSafeInteger(targetMinor) || targetMinor <= 0 || targetMinor < savedMinor) {
+          throw new Error('The target cannot be lower than the amount already saved.');
+        }
+        await db.runAsync('UPDATE goals SET name=?, target_minor=?, saved_minor=? WHERE id=?', name.trim(), targetMinor, savedMinor, id);
+      });
+      const update = (goal: Goal) => goal.id === id ? { ...goal, name: name.trim(), targetMinor, savedMinor } : goal;
+      setGoals((current) => current.map(update));
+      setGoalRecords((current) => current.map(update));
     },
     [db]
   );
 
   const addToGoal = useCallback(
     async (id: number, amountMinor: number) => {
-      await db.runAsync('UPDATE goals SET saved_minor = MIN(target_minor, saved_minor + ?) WHERE id=?', amountMinor, id);
-      setGoals((current) =>
-        current.map((goal) =>
-          goal.id === id ? { ...goal, savedMinor: Math.min(goal.targetMinor, goal.savedMinor + amountMinor) } : goal
-        )
-      );
+      if (goalOperationLocks.current.has(id)) {
+        throw new Error('A savings update for this goal is already being processed.');
+      }
+      goalOperationLocks.current.add(id);
+      try {
+        const occurredAt = new Date().toISOString();
+        let nextSaved = 0;
+        let transactionId = 0;
+        await db.withTransactionAsync(async () => {
+          const row = await db.getFirstAsync<{ id: number; target_minor: number; deleted_at: string | null }>(
+            'SELECT id, target_minor, deleted_at FROM goals WHERE id = ?',
+            id
+          );
+          if (!row || row.deleted_at !== null) {
+            throw new Error('This goal no longer exists.');
+          }
+
+          const savedMinor = await getGoalLedgerBalance(db, id);
+          nextSaved = applyGoalBalanceChange(savedMinor, 'deposit', amountMinor, row.target_minor);
+          await db.runAsync('UPDATE goals SET saved_minor = ? WHERE id=?', nextSaved, id);
+          const result = await db.runAsync(
+            'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            id,
+            'deposit',
+            amountMinor,
+            occurredAt,
+            null,
+            occurredAt
+          );
+          transactionId = Number(result.lastInsertRowId ?? 0);
+        });
+
+        setGoals((current) => current.map((goal) => goal.id === id ? { ...goal, savedMinor: nextSaved } : goal));
+        setGoalRecords((current) => current.map((goal) => goal.id === id ? { ...goal, savedMinor: nextSaved } : goal));
+        if (transactionId > 0) {
+          setGoalTransactions((current) => [
+            { id: transactionId, goalId: id, kind: 'deposit', amountMinor, occurredAt, note: null },
+            ...current,
+          ]);
+        }
+      } finally {
+        goalOperationLocks.current.delete(id);
+      }
+    },
+    [db]
+  );
+
+  const withdrawFromGoal = useCallback(
+    async (id: number, amountMinor: number) => {
+      if (goalOperationLocks.current.has(id)) {
+        throw new Error('A savings update for this goal is already being processed.');
+      }
+      goalOperationLocks.current.add(id);
+      try {
+        const occurredAt = new Date().toISOString();
+        let nextSaved = 0;
+        let transactionId = 0;
+        await db.withTransactionAsync(async () => {
+          const row = await db.getFirstAsync<{ id: number; deleted_at: string | null }>(
+            'SELECT id, deleted_at FROM goals WHERE id = ?',
+            id
+          );
+          if (!row || row.deleted_at !== null) {
+            throw new Error('This goal no longer exists.');
+          }
+
+          const savedMinor = await getGoalLedgerBalance(db, id);
+          nextSaved = applyGoalBalanceChange(savedMinor, 'withdrawal', amountMinor);
+          await db.runAsync('UPDATE goals SET saved_minor = ? WHERE id=?', nextSaved, id);
+          const result = await db.runAsync(
+            'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            id,
+            'withdrawal',
+            amountMinor,
+            occurredAt,
+            null,
+            occurredAt
+          );
+          transactionId = Number(result.lastInsertRowId ?? 0);
+        });
+
+        setGoals((current) => current.map((goal) => goal.id === id ? { ...goal, savedMinor: nextSaved } : goal));
+        setGoalRecords((current) => current.map((goal) => goal.id === id ? { ...goal, savedMinor: nextSaved } : goal));
+        if (transactionId > 0) {
+          setGoalTransactions((current) => [
+            { id: transactionId, goalId: id, kind: 'withdrawal', amountMinor, occurredAt, note: null },
+            ...current,
+          ]);
+        }
+      } finally {
+        goalOperationLocks.current.delete(id);
+      }
     },
     [db]
   );
 
   const removeGoal = useCallback(
     async (id: number) => {
-      await db.runAsync('DELETE FROM goals WHERE id=?', id);
-      setGoals((current) => current.filter((g) => g.id !== id));
+      if (goalOperationLocks.current.has(id)) {
+        throw new Error('A savings update for this goal is already being processed.');
+      }
+      goalOperationLocks.current.add(id);
+      try {
+        const deletedAt = new Date().toISOString();
+        let closedGoal: Goal | null = null;
+        let closureTransaction: GoalTransaction | null = null;
+        await db.withTransactionAsync(async () => {
+          const row = await db.getFirstAsync<{
+            id: number;
+            name: string;
+            target_minor: number;
+            created_at: string;
+            deleted_at: string | null;
+          }>('SELECT id, name, target_minor, created_at, deleted_at FROM goals WHERE id=?', id);
+          if (!row || row.deleted_at !== null) {
+            throw new Error('This goal has already been closed or no longer exists.');
+          }
+
+          const savedMinor = await getGoalLedgerBalance(db, id);
+          if (savedMinor > 0) {
+            const result = await db.runAsync(
+              'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+              id,
+              'withdrawal',
+              savedMinor,
+              deletedAt,
+              `Goal closed: ${row.name}`,
+              deletedAt
+            );
+            closureTransaction = {
+              id: Number(result.lastInsertRowId ?? 0),
+              goalId: id,
+              kind: 'withdrawal',
+              amountMinor: savedMinor,
+              occurredAt: deletedAt,
+              note: `Goal closed: ${row.name}`,
+            };
+          }
+
+          await db.runAsync('UPDATE goals SET saved_minor=0, deleted_at=? WHERE id=?', deletedAt, id);
+          closedGoal = {
+            id: row.id,
+            name: row.name,
+            targetMinor: row.target_minor,
+            savedMinor: 0,
+            createdAt: row.created_at,
+            deletedAt,
+          };
+        });
+
+        setGoals((current) => current.filter((goal) => goal.id !== id));
+        if (closedGoal) {
+          setGoalRecords((current) => current.map((goal) => goal.id === id ? closedGoal as Goal : goal));
+        }
+        if (closureTransaction) {
+          setGoalTransactions((current) => [closureTransaction as GoalTransaction, ...current]);
+        }
+      } finally {
+        goalOperationLocks.current.delete(id);
+      }
     },
     [db]
   );
@@ -440,12 +767,34 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const logZeroSpendDay = useCallback(
+    async (dateKey: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+        throw new Error('Invalid zero-spend day.');
+      }
+      const createdAt = new Date().toISOString();
+      await db.runAsync('INSERT OR IGNORE INTO zero_spend_days (date_key, created_at) VALUES (?, ?)', dateKey, createdAt);
+      setZeroSpendDays((current) => Array.from(new Set([...current, dateKey])).sort((a, b) => b.localeCompare(a)));
+    },
+    [db]
+  );
+
+  const removeZeroSpendDay = useCallback(
+    async (dateKey: string) => {
+      await db.runAsync('DELETE FROM zero_spend_days WHERE date_key = ?', dateKey);
+      setZeroSpendDays((current) => current.filter((day) => day !== dateKey));
+    },
+    [db]
+  );
+
   const resetAllData = useCallback(async () => {
     await db.withTransactionAsync(async () => {
       await db.runAsync('DELETE FROM expenses');
       await db.runAsync('DELETE FROM incomes');
+      await db.runAsync('DELETE FROM goal_transactions');
       await db.runAsync('DELETE FROM goals');
       await db.runAsync('DELETE FROM category_budgets');
+      await db.runAsync('DELETE FROM zero_spend_days');
       await db.runAsync('UPDATE preferences SET name="", allowance_minor=0, cycle_start_day=1, pacing_mode="adaptive", onboarded=0 WHERE id=1');
     });
     await refresh();
@@ -453,83 +802,164 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const restoreBackup = useCallback(
     async (jsonString: string) => {
-      const data = JSON.parse(jsonString) as {
+      let data: unknown;
+      try {
+        data = JSON.parse(jsonString) as unknown;
+      } catch {
+        throw new Error('Invalid PocketPal backup file.');
+      }
+
+      const payload = data as {
         app?: string;
+        version?: number;
+        schemaVersion?: number;
         preferences?: Partial<Preferences>;
         expenses?: Expense[];
+        incomes?: Income[];
         goals?: Goal[];
+        goalTransactions?: GoalTransaction[];
         budgets?: Record<string, number>;
+        zeroSpendDays?: string[];
       };
-      if (!data || data.app !== 'Pennywise') {
-        throw new Error('Invalid Pennywise backup file.');
-      }
-      await db.withTransactionAsync(async () => {
-        if (data.preferences) {
-          await db.runAsync(
-            'UPDATE preferences SET name=?, currency=?, allowance_minor=?, cycle_start_day=?, theme_mode=?, pacing_mode=?, onboarded=? WHERE id=1',
-            data.preferences.name || '',
-            data.preferences.currency || 'INR',
-            data.preferences.allowanceMinor || 0,
-            data.preferences.cycleStartDay || 1,
-            data.preferences.themeMode || 'system',
-            data.preferences.pacingMode || 'adaptive',
-            Number(data.preferences.onboarded) || 0
+      validateBackupPayload(payload);
+
+      const currentSnapshot = generateBackupJSON(
+        preferences,
+        expenses,
+        goalRecords,
+        budgets,
+        zeroSpendDays,
+        incomes,
+        goalTransactions
+      );
+
+      const applyPayload = async (source: typeof payload) => {
+        await db.withTransactionAsync(async () => {
+          if (source.preferences) {
+            await db.runAsync(
+              'UPDATE preferences SET name=?, currency=?, allowance_minor=?, cycle_start_day=?, theme_mode=?, pacing_mode=?, onboarded=? WHERE id=1',
+              source.preferences.name || '',
+              source.preferences.currency || 'INR',
+              source.preferences.allowanceMinor || 0,
+              source.preferences.cycleStartDay || 1,
+              source.preferences.themeMode || 'system',
+              source.preferences.pacingMode || 'adaptive',
+              Number(source.preferences.onboarded) || 0
+            );
+          }
+          if (Array.isArray(source.expenses)) {
+            await db.runAsync('DELETE FROM expenses');
+            for (const e of source.expenses) {
+              await db.runAsync(
+                'INSERT INTO expenses (id, amount_minor, title, category, occurred_at, reflection, note, created_at) VALUES (?,?,?,?,?,?,?,?)',
+                e.id,
+                e.amountMinor,
+                e.title,
+                e.category,
+                e.occurredAt,
+                e.reflection || null,
+                e.note || null,
+                e.occurredAt
+              );
+            }
+          }
+          if (Array.isArray(source.incomes)) {
+            await db.runAsync('DELETE FROM incomes');
+            for (const inc of source.incomes) {
+              await db.runAsync(
+                'INSERT INTO incomes (id, amount_minor, title, source, occurred_at, note, created_at) VALUES (?,?,?,?,?,?,?)',
+                inc.id,
+                inc.amountMinor,
+                inc.title,
+                inc.source || 'Other',
+                inc.occurredAt,
+                inc.note || null,
+                inc.occurredAt
+              );
+            }
+          }
+          if (Array.isArray(source.goals)) {
+            await db.runAsync('DELETE FROM goals');
+            for (const g of source.goals) {
+              await db.runAsync(
+                'INSERT INTO goals (id, name, target_minor, saved_minor, created_at, deleted_at) VALUES (?,?,?,?,?,?)',
+                g.id,
+                g.name,
+                g.targetMinor,
+                g.savedMinor,
+                g.createdAt || new Date().toISOString(),
+                g.deletedAt || null
+              );
+            }
+          }
+          if (Array.isArray(source.goalTransactions)) {
+            await db.runAsync('DELETE FROM goal_transactions');
+            for (const tx of source.goalTransactions) {
+              if (!tx || !tx.goalId) continue;
+              await db.runAsync(
+                'INSERT INTO goal_transactions (id, goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?,?,?,?,?,?,?)',
+                tx.id,
+                tx.goalId,
+                tx.kind === 'withdrawal' ? 'withdrawal' : 'deposit',
+                tx.amountMinor,
+                tx.occurredAt || new Date().toISOString(),
+                tx.note || null,
+                tx.occurredAt || new Date().toISOString()
+              );
+            }
+          } else if (Array.isArray(source.goals)) {
+            await db.runAsync('DELETE FROM goal_transactions');
+            const importedAt = new Date().toISOString();
+            for (const goal of source.goals) {
+              if (goal.savedMinor <= 0) continue;
+              await db.runAsync(
+                'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+                goal.id,
+                'deposit',
+                goal.savedMinor,
+                importedAt,
+                'Opening balance imported from a legacy backup',
+                importedAt
+              );
+            }
+          }
+          if (source.budgets && typeof source.budgets === 'object') {
+            await db.runAsync('DELETE FROM category_budgets');
+            for (const [cat, amt] of Object.entries(source.budgets)) {
+              await db.runAsync('INSERT INTO category_budgets (category, amount_minor) VALUES (?,?)', cat, amt);
+            }
+          }
+          if (Array.isArray(source.zeroSpendDays)) {
+            await db.runAsync('DELETE FROM zero_spend_days');
+            for (const dateKey of source.zeroSpendDays) {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey))) continue;
+              await db.runAsync('INSERT INTO zero_spend_days (date_key, created_at) VALUES (?, ?)', String(dateKey), new Date().toISOString());
+            }
+          }
+        });
+      };
+
+      try {
+        await applyPayload(payload);
+        await refresh();
+      } catch (error) {
+        try {
+          const previousPayload = JSON.parse(currentSnapshot) as typeof payload;
+          await applyPayload(previousPayload);
+          await refresh();
+        } catch (rollbackError) {
+          throw new Error(
+            `The import failed, and rollback also failed${rollbackError instanceof Error ? `: ${rollbackError.message}` : '.'}`
           );
         }
-        if (Array.isArray(data.expenses)) {
-          await db.runAsync('DELETE FROM expenses');
-          for (const e of data.expenses) {
-            await db.runAsync(
-              'INSERT INTO expenses (id, amount_minor, title, category, occurred_at, reflection, note, created_at) VALUES (?,?,?,?,?,?,?,?)',
-              e.id,
-              e.amountMinor,
-              e.title,
-              e.category,
-              e.occurredAt,
-              e.reflection || null,
-              e.note || null,
-              e.occurredAt
-            );
-          }
-        }
-        if (Array.isArray((data as { incomes?: Income[] }).incomes)) {
-          await db.runAsync('DELETE FROM incomes');
-          for (const inc of (data as { incomes: Income[] }).incomes) {
-            await db.runAsync(
-              'INSERT INTO incomes (id, amount_minor, title, source, occurred_at, note, created_at) VALUES (?,?,?,?,?,?,?)',
-              inc.id,
-              inc.amountMinor,
-              inc.title,
-              inc.source || 'Other',
-              inc.occurredAt,
-              inc.note || null,
-              inc.occurredAt
-            );
-          }
-        }
-        if (Array.isArray(data.goals)) {
-          await db.runAsync('DELETE FROM goals');
-          for (const g of data.goals) {
-            await db.runAsync(
-              'INSERT INTO goals (id, name, target_minor, saved_minor, created_at) VALUES (?,?,?,?,?)',
-              g.id,
-              g.name,
-              g.targetMinor,
-              g.savedMinor,
-              g.createdAt || new Date().toISOString()
-            );
-          }
-        }
-        if (data.budgets && typeof data.budgets === 'object') {
-          await db.runAsync('DELETE FROM category_budgets');
-          for (const [cat, amt] of Object.entries(data.budgets)) {
-            await db.runAsync('INSERT INTO category_budgets (category, amount_minor) VALUES (?,?)', cat, amt);
-          }
-        }
-      });
-      await refresh();
+        throw new Error(
+          error instanceof Error
+            ? `The import failed, and the previous local data was restored. Reason: ${error.message}`
+            : 'The import failed, and the previous local data was restored.'
+        );
+      }
     },
-    [db, refresh]
+    [budgets, db, expenses, goalRecords, incomes, preferences, goalTransactions, refresh, zeroSpendDays]
   );
 
   const value = useMemo(
@@ -541,7 +971,10 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       expenses,
       incomes,
       goals,
+      goalRecords,
+      goalTransactions,
       budgets,
+      zeroSpendDays,
       savePreferences,
       addExpense,
       updateExpense,
@@ -551,8 +984,11 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       saveGoal,
       updateGoal,
       addToGoal,
+      withdrawFromGoal,
       removeGoal,
       saveBudget,
+      logZeroSpendDay,
+      removeZeroSpendDay,
       resetAllData,
       restoreBackup,
     }),
@@ -564,7 +1000,10 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       expenses,
       incomes,
       goals,
+      goalRecords,
+      goalTransactions,
       budgets,
+      zeroSpendDays,
       savePreferences,
       addExpense,
       updateExpense,
@@ -574,8 +1013,11 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       saveGoal,
       updateGoal,
       addToGoal,
+      withdrawFromGoal,
       removeGoal,
       saveBudget,
+      logZeroSpendDay,
+      removeZeroSpendDay,
       resetAllData,
       restoreBackup,
     ]

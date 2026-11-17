@@ -13,21 +13,22 @@ import {
   ui,
   usePalette,
 } from '@/components/app-ui';
-import { allowanceProgress, formatMoney } from '@/finance.mjs';
+import { allowanceProgress, formatMoney, reconcileGoalBalances } from '@/finance.mjs';
 import { Goal, useFinance } from '@/store';
 
 export default function GoalsScreen() {
   const p = usePalette();
-  const { goals, preferences, removeGoal } = useFinance();
+  const { goals, goalTransactions, preferences, removeGoal } = useFinance();
+  const goalBalances = reconcileGoalBalances(goals, goalTransactions);
 
-  const totalSaved = goals.reduce((sum, g) => sum + g.savedMinor, 0);
+  const totalSaved = goals.reduce((sum, g) => sum + (goalBalances[g.id] ?? g.savedMinor), 0);
   const totalTarget = goals.reduce((sum, g) => sum + g.targetMinor, 0);
-  const completedCount = goals.filter((g) => g.savedMinor >= g.targetMinor).length;
+  const completedCount = goals.filter((g) => (goalBalances[g.id] ?? g.savedMinor) >= g.targetMinor).length;
 
   const confirmDelete = (goal: Goal) => {
     Alert.alert(
       'Remove this goal?',
-      `“${goal.name}” will be removed. Stored progress will not be recovered.`,
+      `“${goal.name}” will be closed. Any remaining savings will be returned to your available budget, and its history will be kept.`,
       [
         { text: 'Keep goal', style: 'cancel' },
         {
@@ -78,8 +79,9 @@ export default function GoalsScreen() {
             <SectionTitle title="Your targets" detail="Small, steady contributions add up" />
 
             {goals.map((goal) => {
-              const progress = allowanceProgress(goal.savedMinor, goal.targetMinor);
-              const isComplete = goal.savedMinor >= goal.targetMinor;
+              const savedMinor = goalBalances[goal.id] ?? goal.savedMinor;
+              const progress = allowanceProgress(savedMinor, goal.targetMinor);
+              const isComplete = savedMinor >= goal.targetMinor;
 
               return (
                 <Surface key={goal.id} style={{ padding: 18, gap: 14 }}>
@@ -87,7 +89,7 @@ export default function GoalsScreen() {
                     <View style={{ flex: 1, gap: 2 }}>
                       <AppText variant="headline">{goal.name}</AppText>
                       <AppText variant="caption" color={p.textSecondary} tabular>
-                        {formatMoney(goal.savedMinor, preferences.currency)} of{' '}
+                        {formatMoney(savedMinor, preferences.currency)} of{' '}
                         {formatMoney(goal.targetMinor, preferences.currency)}
                       </AppText>
                     </View>
@@ -103,22 +105,48 @@ export default function GoalsScreen() {
                   <ProgressBar value={progress} color={isComplete ? p.accent : p.accent} height={8} />
 
                   <View style={[ui.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
-                    {isComplete ? (
-                      <AppText variant="captionMedium" color={p.accent}>
-                        Target reached. Nicely done!
-                      </AppText>
-                    ) : (
+                    <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+                      {isComplete ? (
+                        <AppText variant="captionMedium" color={p.accent}>
+                          Target reached. Nicely done!
+                        </AppText>
+                      ) : (
+                        <ActionButton
+                          label="Add savings"
+                          variant="quiet"
+                          onPress={() =>
+                            router.push({
+                              pathname: '/goal-add',
+                              params: { id: goal.id.toString() },
+                            })
+                          }
+                        />
+                      )}
+
                       <ActionButton
-                        label="Add savings"
+                        label="Edit"
                         variant="quiet"
                         onPress={() =>
                           router.push({
-                            pathname: '/goal-add',
+                            pathname: '/goal-edit',
                             params: { id: goal.id.toString() },
                           })
                         }
                       />
-                    )}
+
+                      {savedMinor > 0 ? (
+                        <ActionButton
+                          label="Withdraw"
+                          variant="quiet"
+                          onPress={() =>
+                            router.push({
+                              pathname: '/goal-withdraw',
+                              params: { id: goal.id.toString() },
+                            })
+                          }
+                        />
+                      ) : null}
+                    </View>
 
                     <Pressable
                       onPress={() => confirmDelete(goal)}

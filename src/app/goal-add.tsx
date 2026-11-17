@@ -1,18 +1,20 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { ActionButton, AppText, Screen, Surface, usePalette } from '@/components/app-ui';
-import { formatMoney, toMinorUnits } from '@/finance.mjs';
+import { formatMoney, reconcileGoalBalances, toMinorUnits } from '@/finance.mjs';
 import { useFinance } from '@/store';
 
 export default function AddToGoalScreen() {
   const p = usePalette();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { preferences, goals, addToGoal } = useFinance();
+  const { preferences, goals, goalTransactions, addToGoal } = useFinance();
   const goal = goals.find((item) => item.id === Number(id));
+  const goalBalances = reconcileGoalBalances(goals, goalTransactions);
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
 
   if (!goal) {
     return (
@@ -25,7 +27,8 @@ export default function AddToGoalScreen() {
     );
   }
 
-  const remainingToGoal = Math.max(0, goal.targetMinor - goal.savedMinor);
+  const savedMinor = goalBalances[goal.id] ?? goal.savedMinor;
+  const remainingToGoal = Math.max(0, goal.targetMinor - savedMinor);
 
   const submit = async () => {
     const num = Number(amount.replace(/,/g, ''));
@@ -35,6 +38,14 @@ export default function AddToGoalScreen() {
       return;
     }
 
+    const savedMinor = goalBalances[goal.id] ?? goal.savedMinor;
+    if (minor > Math.max(0, goal.targetMinor - savedMinor)) {
+      setError('This contribution would exceed the target for this goal.');
+      return;
+    }
+
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSaving(true);
     try {
       await addToGoal(goal.id, minor);
@@ -42,6 +53,7 @@ export default function AddToGoalScreen() {
     } catch {
       setError('Your contribution could not be saved. Please try again.');
     } finally {
+      submitLock.current = false;
       setSaving(false);
     }
   };
@@ -67,7 +79,7 @@ export default function AddToGoalScreen() {
           {goal.name}
         </AppText>
         <AppText variant="caption" color={p.textSecondary} tabular>
-          Currently saved: {formatMoney(goal.savedMinor, preferences.currency)} of{' '}
+          Currently saved: {formatMoney(savedMinor, preferences.currency)} of{' '}
           {formatMoney(goal.targetMinor, preferences.currency)}
         </AppText>
       </View>

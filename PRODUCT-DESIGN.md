@@ -1,6 +1,6 @@
-# Pennywise Product and Experience Specification
+# PocketPal Product and Experience Specification
 
-Pennywise is a private, offline-first student budgeting and allowance companion. It provides calm, clear visibility into everyday spending, category budgets, and allowance cycles—free of guilt, gamification, bank credentials, cloud tracking, or synthetic data.
+PocketPal is a private, offline-first student budgeting and allowance companion. It provides calm, clear visibility into everyday spending, category budgets, and allowance cycles—free of guilt, gamification, bank credentials, cloud tracking, or synthetic data.
 
 ---
 

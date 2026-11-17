@@ -3,7 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import React, { Suspense, useEffect, useMemo } from 'react';
-import { ActivityIndicator, StyleSheet, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { ActionButton, AppText, Screen, Surface, usePalette } from '@/components/app-ui';
 import { Colors } from '@/constants/theme';
 import { DatabaseProvider, useFinance } from '@/store';
@@ -24,13 +24,17 @@ export default function RootLayout() {
 function LoadingFallback() {
   const scheme = useColorScheme();
   const dark = scheme === 'dark';
-  const bg = dark ? Colors.dark.background : Colors.light.background;
-  const accent = dark ? Colors.dark.accent : Colors.light.accent;
+  const bg = Platform.OS === 'web'
+    ? 'var(--pocketpal-loading-background)'
+    : dark ? Colors.dark.background : Colors.light.background;
+  const accent = Platform.OS === 'web'
+    ? 'var(--pocketpal-loading-accent)'
+    : dark ? Colors.dark.accent : Colors.light.accent;
 
   return (
     <View style={[styles.center, { backgroundColor: bg }]}>
       <ActivityIndicator color={accent} size="large" />
-      <StatusBar style={dark ? 'light' : 'dark'} />
+      <StatusBar style={Platform.OS === 'web' ? 'auto' : dark ? 'light' : 'dark'} />
     </View>
   );
 }
@@ -135,6 +139,27 @@ function RootNavigator() {
         />
         <Stack.Screen
           name="goal-add"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="goal-edit"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="goal-withdraw"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="restore"
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',

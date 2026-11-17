@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 import {
   AppScaffold,
   AppText,
@@ -17,37 +18,72 @@ import {
 } from '@/components/app-ui';
 import {
   allowanceProgress,
-  calculateDailyPace,
+  calculateBudgetSummary,
+  buildActivityRecords,
   cycleStart,
   dailySpendTrend,
   formatMoney,
   monthlySpendTrend,
   nextCycleStart,
-  remainingAllowance,
+  reconcileGoalBalances,
   sumExpenses,
   weeklySpendTrend,
 } from '@/finance.mjs';
-import { Expense, useFinance } from '@/store';
+import type { ActivityRecord } from '@/finance.mjs';
+import { useFinance } from '@/store';
 
-function ExpenseRow({ expense, currency }: { expense: Expense; currency: string }) {
+function ActivityRow({ record, currency }: { record: ActivityRecord; currency: string }) {
   const p = usePalette();
-  const date = new Date(expense.occurredAt);
+  const date = new Date(record.occurredAt);
   const time = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const isExpense = record.type === 'expense';
+  const isIncome = record.type === 'income';
+  const isAllocation = record.type === 'savingsAllocation';
+  const isPositive = isIncome || record.type === 'savingsWithdrawal' || record.type === 'goalClosure';
+  const title =
+    isExpense || isIncome
+      ? record.title
+      : record.type === 'goalClosure'
+      ? 'Goal closed'
+      : isAllocation
+      ? 'Savings allocation'
+      : 'Savings withdrawal';
+  const detail = isExpense
+    ? `${record.category} · ${time}`
+    : isIncome
+    ? `Income${record.description ? ` · ${record.description}` : ''} · ${time}`
+    : `${record.goalName ?? 'Savings goal'} · ${time}`;
 
   return (
     <View style={[ui.row, { gap: 12 }]}>
-      <CategoryMark category={expense.category} size={36} />
+      {isExpense && record.category ? (
+        <CategoryMark category={record.category} size={36} />
+      ) : (
+        <View style={[styles.activityIcon, { backgroundColor: isPositive ? p.accentSoft : p.backgroundSelected }]}>
+          <SymbolView
+            name={
+              isIncome
+                ? { ios: 'arrow.down.left', android: 'south_west', web: 'south_west' }
+                : isAllocation
+                ? { ios: 'arrow.up.right', android: 'north_east', web: 'north_east' }
+                : { ios: 'arrow.uturn.backward', android: 'north_west', web: 'north_west' }
+            }
+            size={18}
+            tintColor={isPositive ? p.accent : isAllocation ? p.warning : p.textSecondary}
+          />
+        </View>
+      )}
       <View style={{ flex: 1, gap: 2 }}>
         <AppText variant="bodyMedium" weight="600" numberOfLines={1}>
-          {expense.title}
+          {title}
         </AppText>
         <AppText variant="caption" color={p.textSecondary}>
-          {expense.category} · {time}
-          {expense.reflection ? ` · ${expense.reflection.toLowerCase()}` : ''}
+          {detail}
+          {record.reflection ? ` · ${record.reflection.toLowerCase()}` : ''}
         </AppText>
       </View>
-      <AppText variant="bodyMedium" weight="600" tabular>
-        −{formatMoney(expense.amountMinor, currency)}
+      <AppText variant="bodyMedium" weight="600" color={isPositive ? p.accent : isAllocation ? p.warning : p.text} tabular>
+        {isExpense || isAllocation ? '−' : '+'}{formatMoney(record.amountMinor, currency)}
       </AppText>
     </View>
   );
@@ -57,7 +93,7 @@ const CATEGORIES_FOR_DASHBOARD = ['Food', 'Transport', 'Study', 'Social', 'Shopp
 
 export default function Dashboard() {
   const p = usePalette();
-  const { preferences, expenses, budgets } = useFinance();
+  const { preferences, expenses, incomes, goals, goalRecords, goalTransactions, budgets, zeroSpendDays } = useFinance();
   const now = useMemo(() => new Date(), []);
   const mode = useThemeMode();
   const onDark = mode === 'dark';
@@ -69,9 +105,19 @@ export default function Dashboard() {
   }, [now, preferences.cycleStartDay]);
 
   const spent = useMemo(() => sumExpenses(expenses, start, now), [expenses, start, now]);
-  const remaining = useMemo(
-    () => remainingAllowance(preferences.allowanceMinor, spent),
-    [preferences.allowanceMinor, spent]
+  const incomeMinor = useMemo(
+    () =>
+      incomes.reduce(
+        (total, item) =>
+          total + (item.occurredAt >= start.toISOString() && item.occurredAt <= now.toISOString() ? item.amountMinor : 0),
+        0
+      ),
+    [incomes, start, now]
+  );
+  const goalBalances = useMemo(() => reconcileGoalBalances(goals, goalTransactions), [goals, goalTransactions]);
+  const savingsReservedMinor = useMemo(
+    () => Object.values(goalBalances).reduce((total, amount) => total + Number(amount || 0), 0),
+    [goalBalances]
   );
   const daysLeft = useMemo(
     () => Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 86400000)),
@@ -81,22 +127,27 @@ export default function Dashboard() {
     () => Math.max(1, Math.round((next.getTime() - start.getTime()) / 86400000)),
     [next, start]
   );
+  const budgetSummary = useMemo(
+    () =>
+      calculateBudgetSummary({
+        allowanceMinor: preferences.allowanceMinor,
+        incomeMinor,
+        expenseMinor: spent,
+        savingsReservedMinor,
+        totalCycleDays,
+        daysLeft,
+        pacingMode: preferences.pacingMode,
+        zeroSpendDays,
+      }),
+    [preferences.allowanceMinor, incomeMinor, spent, savingsReservedMinor, totalCycleDays, daysLeft, preferences.pacingMode, zeroSpendDays]
+  );
+  const remaining = budgetSummary.remainingMinor;
   const daysElapsed = useMemo(
     () => Math.max(1, Math.ceil((now.getTime() - start.getTime()) / 86400000)),
     [now, start]
   );
 
-  const dailyPacing = useMemo(
-    () =>
-      calculateDailyPace({
-        allowanceMinor: preferences.allowanceMinor,
-        spentMinor: spent,
-        totalCycleDays,
-        daysLeft,
-        pacingMode: preferences.pacingMode,
-      }),
-    [preferences.allowanceMinor, spent, totalCycleDays, daysLeft, preferences.pacingMode]
-  );
+  const displayDailyRoom = budgetSummary.dailyRoomMinor;
 
   const dailyPace = Math.round(spent / daysElapsed);
 
@@ -112,7 +163,10 @@ export default function Dashboard() {
     return dailySpendTrend(expenses, start, now);
   }, [expenses, start, now, granularity]);
 
-  const recent = useMemo(() => expenses.slice(0, 3), [expenses]);
+  const recent = useMemo(
+    () => buildActivityRecords({ expenses, incomes, goals: goalRecords, goalTransactions }).slice(0, 3),
+    [expenses, incomes, goalRecords, goalTransactions]
+  );
   const hasBudget = useMemo(() => Object.values(budgets).some((amount) => amount > 0), [budgets]);
 
   const heroBg = onDark ? '#19221D' : p.accent;
@@ -189,7 +243,7 @@ export default function Dashboard() {
               {preferences.pacingMode === 'adaptive' ? 'Adaptive room' : 'Daily target'}
             </AppText>
             <AppText variant="title" weight="700" tabular>
-              {formatMoney(dailyPacing.dailyRoomMinor, preferences.currency)}
+              {formatMoney(displayDailyRoom, preferences.currency)}
             </AppText>
             <AppText variant="caption" color={p.textSecondary}>
               {preferences.pacingMode === 'adaptive' ? 'with zero-spend rollover' : 'steady benchmark'}
@@ -296,14 +350,14 @@ export default function Dashboard() {
         <View style={{ gap: 12 }}>
           <SectionTitle
             title="Recent activity"
-            actionLabel={expenses.length ? 'See all' : undefined}
+            actionLabel={recent.length ? 'See all' : undefined}
             onPress={() => router.push('/activity')}
           />
           {recent.length ? (
             <Surface style={{ padding: 16 }}>
-              {recent.map((expense, idx) => (
-                <View key={expense.id}>
-                  <ExpenseRow expense={expense} currency={preferences.currency} />
+              {recent.map((record, idx) => (
+                <View key={record.key}>
+                  <ActivityRow record={record} currency={preferences.currency} />
                   {idx < recent.length - 1 ? (
                     <View style={[styles.divider, { backgroundColor: p.border }]} />
                   ) : null}
@@ -312,9 +366,9 @@ export default function Dashboard() {
             </Surface>
           ) : (
             <Surface style={{ padding: 20, gap: 6 }}>
-              <AppText variant="headline">No expenses logged yet</AppText>
+              <AppText variant="headline">No activity recorded yet</AppText>
               <AppText variant="body" color={p.textSecondary}>
-                Tap the plus button below to log your first spend. It takes just a few seconds.
+                Your expenses, income, and savings updates will appear here.
               </AppText>
             </Surface>
           )}
@@ -342,5 +396,12 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginVertical: 12,
     marginLeft: 48,
+  },
+  activityIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

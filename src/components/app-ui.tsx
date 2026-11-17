@@ -14,8 +14,9 @@ import {
   ViewStyle,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 import { ColorPalette, Colors, Fonts, ThemeMode, Typography } from '@/constants/theme';
-import { calculateLoggingStreak, currencyDigits, formatMoney, monthCalendarData } from '@/finance.mjs';
+import { calculateLoggingStreak, categoryColor, currencyDigits, formatMoney, monthCalendarData } from '@/finance.mjs';
 import { Category, Expense, useFinance } from '@/store';
 
 export function useThemeMode(): ThemeMode {
@@ -309,8 +310,8 @@ const categorySymbols: Record<Category, SymbolViewProps['name']> = {
 };
 
 export function CategoryMark({ category, size = 36 }: { category: string; size?: number }) {
-  const p = usePalette();
   const glyph = category in categorySymbols ? categorySymbols[category as Category] : categorySymbols.Other;
+  const color = categoryColor(category);
 
   return (
     <View
@@ -318,12 +319,12 @@ export function CategoryMark({ category, size = 36 }: { category: string; size?:
         width: size,
         height: size,
         borderRadius: Math.round(size * 0.32),
-        backgroundColor: p.accentSoft,
+        backgroundColor: `${color}22`,
         justifyContent: 'center',
         alignItems: 'center',
       }}
     >
-      <SymbolView name={glyph} size={Math.round(size * 0.48)} tintColor={p.accent} />
+      <SymbolView name={glyph} size={Math.round(size * 0.48)} tintColor={color} />
     </View>
   );
 }
@@ -729,10 +730,71 @@ export function CategoryBreakdownList({
               {formatMoney(item.totalMinor, currency)}
             </AppText>
           </View>
-          <ProgressBar value={item.percentage / 100} height={6} />
+          <ProgressBar value={item.percentage / 100} height={6} color={categoryColor(item.category)} />
         </View>
       ))}
     </Surface>
+  );
+}
+
+export function CategoryDonut({
+  segments,
+  size = 110,
+  children,
+}: PropsWithChildren<{
+  segments: { category: string; percentage: number }[];
+  size?: number;
+}>) {
+  const p = usePalette();
+  const strokeWidth = Math.max(8, Math.round(size * 0.09));
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const renderedSegments = segments.map((segment, index) => {
+    const precedingPercentage = segments
+      .slice(0, index)
+      .reduce((total, previous) => total + Math.min(100, Math.max(0, previous.percentage)), 0);
+    const segmentLength = circumference * Math.min(100, Math.max(0, segment.percentage)) / 100;
+    return {
+      ...segment,
+      segmentLength,
+      dashOffset: -(circumference * precedingPercentage / 100),
+    };
+  });
+
+  return (
+    <View
+      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+      accessibilityRole="image"
+      accessibilityLabel={`Spending category chart with ${segments.length} categories`}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={p.backgroundSelected}
+          strokeWidth={strokeWidth}
+        />
+        {renderedSegments.map((segment) => (
+            <Circle
+              key={segment.category}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={categoryColor(segment.category)}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${segment.segmentLength} ${circumference - segment.segmentLength}`}
+              strokeDashoffset={segment.dashOffset}
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
+        ))}
+      </Svg>
+      <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: strokeWidth + 4 }}>
+        {children}
+      </View>
+    </View>
   );
 }
 
@@ -740,7 +802,8 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export function StreakCard({ expenses }: { expenses: Expense[] }) {
   const p = usePalette();
-  const streak = useMemo(() => calculateLoggingStreak(expenses), [expenses]);
+  const { zeroSpendDays } = useFinance();
+  const streak = useMemo(() => calculateLoggingStreak(expenses, new Date(), zeroSpendDays), [expenses, zeroSpendDays]);
 
   return (
     <Surface style={{ padding: 16, borderColor: p.border }}>
@@ -805,9 +868,11 @@ export function ExpenseCalendarHeatmap({
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
 
+  const { zeroSpendDays } = useFinance();
+
   const calData = useMemo(
-    () => monthCalendarData(expenses, currentYear, currentMonth, now),
-    [expenses, currentYear, currentMonth, now]
+    () => monthCalendarData(expenses, currentYear, currentMonth, now, zeroSpendDays),
+    [expenses, currentYear, currentMonth, now, zeroSpendDays]
   );
 
   const prevMonth = () => {
@@ -986,14 +1051,17 @@ export function ExpenseCalendarHeatmap({
                 },
               ]}
             >
-              <AppText
-                variant="caption"
-                size={11}
-                weight={day.isToday || isSelected ? '700' : '500'}
-                color={textColor}
-              >
-                {day.dayNumber}
-              </AppText>
+              <View style={styles.calDayNumber}>
+                <AppText
+                  variant="caption"
+                  size={11}
+                  weight={day.isToday || isSelected ? '700' : '500'}
+                  color={textColor}
+                  style={{ textAlign: 'center' }}
+                >
+                  {day.dayNumber}
+                </AppText>
+              </View>
               {day.isZeroSpend ? (
                 <View style={[styles.zeroDot, { backgroundColor: '#22C55E' }]} />
               ) : null}
@@ -1212,12 +1280,19 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   calCell: {
-    width: '13.4%',
+    width: '12.8%',
     aspectRatio: 1,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    flexShrink: 0,
+  },
+  calDayNumber: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   zeroDot: {
     position: 'absolute',
