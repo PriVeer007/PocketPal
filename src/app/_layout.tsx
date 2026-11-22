@@ -108,7 +108,7 @@ function RootNavigator() {
           headerShown: false,
           contentStyle: { backgroundColor: palette.background },
           animation: 'slide_from_right',
-          animationDuration: 280,
+          animationDuration: 220,
           gestureEnabled: true,
           fullScreenGestureEnabled: true,
         }}
@@ -124,6 +124,7 @@ function RootNavigator() {
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
+            animationDuration: 220,
           }}
         />
         <Stack.Screen
@@ -131,6 +132,7 @@ function RootNavigator() {
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
+            animationDuration: 220,
           }}
         />
         <Stack.Screen
@@ -138,6 +140,7 @@ function RootNavigator() {
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
+            animationDuration: 220,
           }}
         />
         <Stack.Screen
@@ -145,6 +148,7 @@ function RootNavigator() {
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
+            animationDuration: 220,
           }}
         />
         <Stack.Screen
@@ -152,6 +156,7 @@ function RootNavigator() {
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
+            animationDuration: 220,
           }}
         />
         <Stack.Screen
@@ -159,6 +164,7 @@ function RootNavigator() {
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
+            animationDuration: 220,
           }}
         />
         <Stack.Screen
@@ -166,6 +172,7 @@ function RootNavigator() {
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
+            animationDuration: 220,
           }}
         />
       </Stack>

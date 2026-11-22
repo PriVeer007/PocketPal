@@ -99,7 +99,7 @@ export function Screen({
   const content = (
     <View style={styles.screenContent}>
       {title ? (
-        <ScreenMotion delay={0} style={styles.header}>
+        <ScreenMotion style={styles.header}>
           <View style={{ flex: 1, gap: 4 }}>
             {eyebrow ? (
               <AppText variant="eyebrow" color={p.accent} style={styles.eyebrow}>
@@ -113,7 +113,7 @@ export function Screen({
           {action}
         </ScreenMotion>
       ) : null}
-      <ScreenMotion delay={title ? 70 : 0}>
+      <ScreenMotion>
         {children}
       </ScreenMotion>
     </View>

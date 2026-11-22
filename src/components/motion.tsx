@@ -1,13 +1,9 @@
-import { useFocusEffect } from 'expo-router';
-import React, { PropsWithChildren, useCallback, useEffect } from 'react';
-import { Pressable } from 'react-native';
+import React, { PropsWithChildren, useEffect } from 'react';
+import { Pressable, View } from 'react-native';
 import Animated, {
-  cancelAnimation,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withDelay,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -17,62 +13,21 @@ export const Motion = {
   durations: {
     press: 120,
     small: 180,
-    card: 320,
-    screen: 280,
-  },
-  screen: {
-    enterDistance: 14,
+    card: 220,
+    screen: 220,
   },
 };
 
-export function useScreenEntrance(delay = 0) {
-  const reducedMotion = useReducedMotion();
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(Motion.screen.enterDistance);
-
-  useFocusEffect(
-    useCallback(() => {
-      cancelAnimation(opacity);
-      cancelAnimation(translateY);
-
-      if (reducedMotion) {
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value
-        opacity.value = 1;
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value
-        translateY.value = 0;
-        return;
-      }
-
-      opacity.value = 0;
-      translateY.value = Motion.screen.enterDistance;
-      opacity.value = withDelay(delay, withTiming(1, { duration: Motion.durations.card }));
-      translateY.value = withDelay(delay, withTiming(0, { duration: Motion.durations.card }));
-
-      return () => {
-        cancelAnimation(opacity);
-        cancelAnimation(translateY);
-      };
-    }, [delay, opacity, reducedMotion, translateY])
-  );
-
-  return useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-}
-
 export function ScreenMotion({
   children,
-  delay = 0,
   style,
-}: PropsWithChildren<{ delay?: number; style?: object }>) {
-  const animatedStyle = useScreenEntrance(delay);
-  return <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>;
+}: PropsWithChildren<{ style?: object }>) {
+  return <View style={style}>{children}</View>;
 }
 
 export function useAnimatedProgress(value: number) {
   const reducedMotion = useReducedMotion();
-  const progress = useSharedValue(reducedMotion ? value : 0);
+  const progress = useSharedValue(value);
 
   useEffect(() => {
     progress.value = reducedMotion
@@ -104,7 +59,7 @@ export function MotionBar({
   style?: object | object[];
 }) {
   const reducedMotion = useReducedMotion();
-  const animatedHeight = useSharedValue(reducedMotion ? height : 3);
+  const animatedHeight = useSharedValue(height);
 
   useEffect(() => {
     animatedHeight.value = reducedMotion
@@ -162,7 +117,7 @@ export function MotionPressable({
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value
       scale.value = reducedMotion
         ? 1
-        : withSpring(1, { damping: 16, stiffness: 320, mass: 0.6 });
+        : withTiming(1, { duration: Motion.durations.press });
     }
     onPressOut?.();
   };
