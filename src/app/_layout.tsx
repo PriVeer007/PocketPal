@@ -5,7 +5,7 @@ import * as SystemUI from 'expo-system-ui';
 import React, { Suspense, useEffect, useMemo } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { ActionButton, AppText, Screen, Surface, usePalette } from '@/components/app-ui';
-import { Colors } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { DatabaseProvider, useFinance } from '@/store';
 
 // Prevent splash screen from auto hiding before data is hydrated
@@ -75,8 +75,8 @@ function RootNavigator() {
 
   if (error) {
     return (
-      <Screen title="Your data needs a moment">
-        <Surface style={{ gap: 14 }}>
+      <Screen title="Your data needs a moment" hasBottomNav={false}>
+        <Surface style={{ gap: Spacing.twelve }}>
           <AppText size={14} color={palette.textSecondary}>
             {error}
           </AppText>

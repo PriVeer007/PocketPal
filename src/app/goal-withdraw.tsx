@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { ActionButton, AppText, Screen, Surface, usePalette } from '@/components/app-ui';
+import { ActionButton, AppText, Screen, Surface, ui, usePalette } from '@/components/app-ui';
 import { formatMoney, reconcileGoalBalances, toMinorUnits } from '@/finance.mjs';
 import { useFinance } from '@/store';
 
@@ -18,7 +18,7 @@ export default function WithdrawFromGoalScreen() {
 
   if (!goal) {
     return (
-      <Screen title="Goal not found">
+      <Screen title="Goal not found" hasBottomNav={false}>
         <AppText variant="body" color={p.textSecondary}>
           This savings goal may have been removed.
         </AppText>
@@ -58,6 +58,7 @@ export default function WithdrawFromGoalScreen() {
 
   return (
     <Screen
+      hasBottomNav={false}
       title="Withdraw from goal"
       action={
         <Pressable
@@ -65,6 +66,7 @@ export default function WithdrawFromGoalScreen() {
           accessibilityRole="button"
           accessibilityLabel="Cancel goal withdrawal"
           hitSlop={8}
+          style={ui.textAction}
         >
           <AppText variant="bodyMedium" color={p.accent} weight="600">
             Cancel

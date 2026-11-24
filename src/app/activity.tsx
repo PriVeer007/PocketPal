@@ -17,6 +17,7 @@ import {
 import { buildActivityRecords, formatMoney, localDateKey } from '@/finance.mjs';
 import type { ActivityRecord } from '@/finance.mjs';
 import { CATEGORIES, Category, Expense, useFinance } from '@/store';
+import { Spacing } from '@/constants/theme';
 
 function formatDayHeader(isoString: string) {
   const date = new Date(isoString);
@@ -102,7 +103,7 @@ export default function ActivityScreen() {
     <AppScaffold>
       <Screen eyebrow="Your records" title="Activity">
         {/* Search Bar */}
-        <View style={[ui.row, { gap: 10 }]}>
+        <View style={[ui.row, { gap: Spacing.eight }]}>
           <View
             style={[
               styles.searchBar,
@@ -136,6 +137,7 @@ export default function ActivityScreen() {
               accessibilityRole="button"
               accessibilityLabel="Clear search and category filter"
               hitSlop={8}
+              style={ui.textAction}
             >
               <AppText variant="captionMedium" color={p.accent}>
                 Reset
@@ -144,7 +146,7 @@ export default function ActivityScreen() {
           ) : null}
         </View>
 
-        <View style={styles.filterRow}>
+        <View style={ui.wrapRow}>
           {([
             { id: 'all' as const, label: 'All activity' },
             { id: 'expense' as const, label: 'Expenses' },
@@ -161,7 +163,7 @@ export default function ActivityScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                style={[styles.filterChip, { backgroundColor: active ? p.accent : p.backgroundSelected }]}
+                style={[ui.chip, { backgroundColor: active ? p.accent : p.backgroundSelected }]}
               >
                 <AppText variant="captionMedium" color={active ? onAccent : p.text}>
                   {option.label}
@@ -173,31 +175,28 @@ export default function ActivityScreen() {
 
         {/* Expense category filters */}
         {typeFilter === 'all' || typeFilter === 'expense' ? (
-          <View style={styles.filterRow}>
+          <View style={ui.wrapRow}>
             {(['All', ...CATEGORIES] as const).map((cat) => {
-            const active = filter === cat;
-            return (
-              <Pressable
-                key={cat}
-                onPress={() => setFilter(cat)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: active ? p.accent : p.backgroundSelected,
-                  },
-                ]}
-              >
-                <AppText
-                  variant="captionMedium"
-                  color={active ? onAccent : p.text}
+              const active = filter === cat;
+              return (
+                <Pressable
+                  key={cat}
+                  onPress={() => setFilter(cat)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  style={[
+                    ui.chip,
+                    {
+                      backgroundColor: active ? p.accent : p.backgroundSelected,
+                    },
+                  ]}
                 >
-                  {cat}
-                </AppText>
-              </Pressable>
-            );
-          })}
+                  <AppText variant="captionMedium" color={active ? onAccent : p.text}>
+                    {cat}
+                  </AppText>
+                </Pressable>
+              );
+            })}
           </View>
         ) : null}
 
@@ -216,11 +215,11 @@ export default function ActivityScreen() {
           sortedDays.map((dayKey) => {
             const dayItems = grouped[dayKey];
             return (
-              <View key={dayKey} style={{ gap: 10 }}>
+              <View key={dayKey} style={{ gap: Spacing.eight }}>
                 <AppText variant="captionMedium" color={p.textSecondary}>
                   {formatDayHeader(dayItems[0].occurredAt)}
                 </AppText>
-                <Surface style={{ padding: 16, gap: 0 }}>
+                <Surface style={{ gap: 0 }}>
                   {dayItems.map((item, idx) => {
                     const isExpense = item.type === 'expense';
                     const isIncome = item.type === 'income';
@@ -245,7 +244,7 @@ export default function ActivityScreen() {
                     const expense = isExpense ? expenses.find((entry) => entry.id === item.recordId) : undefined;
 
                     return (
-                    <View key={item.key} style={{ paddingVertical: 10, gap: 6 }}>
+                    <View key={item.key} style={{ paddingVertical: Spacing.eight, gap: Spacing.eight }}>
                       <View style={[ui.row, { gap: 12 }]}>
                         {isExpense && item.category ? (
                           <CategoryMark category={item.category} size={36} />
@@ -280,7 +279,7 @@ export default function ActivityScreen() {
                       ) : null}
 
                       {expense ? (
-                        <View style={[ui.row, { justifyContent: 'flex-end', gap: 14, paddingTop: 2 }]}>
+                        <View style={[ui.row, { justifyContent: 'flex-end', gap: Spacing.twelve, paddingTop: 2 }]}>
                           <Pressable
                             onPress={() => router.push({ pathname: '/edit', params: { id: expense.id.toString() } })}
                             accessibilityRole="button"
@@ -328,28 +327,20 @@ export default function ActivityScreen() {
 const styles = StyleSheet.create({
   searchBar: {
     flex: 1,
-    minHeight: 46,
+    minWidth: 0,
+    minHeight: 48,
     borderRadius: 14,
     borderWidth: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: Spacing.twelve,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Spacing.eight,
   },
   searchInput: {
     flex: 1,
+    minWidth: 0,
     fontSize: 14,
     paddingVertical: 8,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
   },
   activityIcon: {
     width: 36,
@@ -360,7 +351,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    marginTop: 10,
+    marginTop: Spacing.eight,
     marginLeft: 48,
   },
 });

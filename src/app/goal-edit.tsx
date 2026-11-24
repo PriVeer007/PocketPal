@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { ActionButton, AppText, Screen, Surface, usePalette } from '@/components/app-ui';
+import { ActionButton, AppText, Screen, Surface, ui, usePalette } from '@/components/app-ui';
 import { currencyDigits, formatMoney, reconcileGoalBalances, toMinorUnits } from '@/finance.mjs';
 import { useFinance } from '@/store';
 
@@ -20,7 +20,7 @@ export default function EditGoalScreen() {
 
   if (!goal) {
     return (
-      <Screen title="Goal not found">
+      <Screen title="Goal not found" hasBottomNav={false}>
         <AppText variant="body" color={p.textSecondary}>
           This savings goal may have been removed.
         </AppText>
@@ -58,6 +58,7 @@ export default function EditGoalScreen() {
 
   return (
     <Screen
+      hasBottomNav={false}
       title="Edit goal"
       action={
         <Pressable
@@ -65,6 +66,7 @@ export default function EditGoalScreen() {
           accessibilityRole="button"
           accessibilityLabel="Cancel goal edit"
           hitSlop={8}
+          style={ui.textAction}
         >
           <AppText variant="bodyMedium" color={p.accent} weight="600">
             Cancel
@@ -84,7 +86,7 @@ export default function EditGoalScreen() {
           placeholderTextColor={p.textSecondary}
           maxLength={50}
           style={[
-            styles.input,
+            ui.input,
             {
               color: p.text,
               backgroundColor: p.backgroundElement,
@@ -94,7 +96,7 @@ export default function EditGoalScreen() {
         />
       </View>
 
-      <Surface style={{ gap: 10 }}>
+      <Surface style={{ gap: 12 }}>
         <AppText variant="captionMedium">Updated target amount ({preferences.currency})</AppText>
         <TextInput
           value={amount}
@@ -131,13 +133,6 @@ export default function EditGoalScreen() {
 }
 
 const styles = StyleSheet.create({
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    fontSize: 15,
-  },
   amountInput: {
     fontSize: 32,
     fontWeight: '700',

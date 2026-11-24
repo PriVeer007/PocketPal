@@ -15,11 +15,13 @@ import {
   CategoryMark,
   Screen,
   Surface,
+  ui,
   useAccentForeground,
   usePalette,
 } from '@/components/app-ui';
 import { currencyDigits, toMinorUnits, validateExpense } from '@/finance.mjs';
 import { CATEGORIES, Category, Reflection, useFinance } from '@/store';
+import { Spacing } from '@/constants/theme';
 
 const reflections: readonly Reflection[] = ['Planned', 'Spontaneous', 'Needed', 'Just wanted it'] as const;
 
@@ -45,7 +47,7 @@ export default function EditExpenseScreen() {
 
   if (!expense) {
     return (
-      <Screen title="Spend not found">
+      <Screen title="Spend not found" hasBottomNav={false}>
         <AppText variant="body" color={p.textSecondary}>
           This expense may have been deleted.
         </AppText>
@@ -106,6 +108,7 @@ export default function EditExpenseScreen() {
     >
       <Screen
         scroll={false}
+        hasBottomNav={false}
         title="Edit spend"
         action={
           <Pressable
@@ -113,6 +116,7 @@ export default function EditExpenseScreen() {
             accessibilityRole="button"
             accessibilityLabel="Cancel edit"
             hitSlop={8}
+            style={ui.textAction}
           >
             <AppText variant="bodyMedium" weight="600" color={p.accent}>
               Cancel
@@ -121,16 +125,16 @@ export default function EditExpenseScreen() {
         }
       >
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 36, gap: 18 }}
+          contentContainerStyle={{ paddingBottom: 32, gap: 16 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Amount Card */}
-          <Surface style={{ alignItems: 'center', paddingVertical: 20, gap: 6 }}>
+          <Surface style={{ alignItems: 'center', paddingVertical: Spacing.twenty, gap: Spacing.eight }}>
             <AppText variant="eyebrow" color={p.textSecondary}>
               AMOUNT ({preferences.currency})
             </AppText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.eight }}>
               <AppText variant="display" color={p.textSecondary} size={32}>
                 {currencySymbol}
               </AppText>
@@ -163,7 +167,7 @@ export default function EditExpenseScreen() {
               maxLength={80}
               returnKeyType="done"
               style={[
-                styles.textInput,
+                ui.input,
                 {
                   color: p.text,
                   borderColor: p.border,
@@ -268,9 +272,9 @@ export default function EditExpenseScreen() {
                 placeholderTextColor={p.textSecondary}
                 maxLength={160}
                 style={[
-                  styles.textInput,
+                  ui.input,
                   {
-                    minHeight: 46,
+                    minHeight: 48,
                     color: p.text,
                     borderColor: p.border,
                     backgroundColor: p.backgroundElement,
@@ -302,24 +306,17 @@ export default function EditExpenseScreen() {
 
 const styles = StyleSheet.create({
   amountInput: {
-    minWidth: 140,
+    flex: 1,
+    minWidth: 0,
     fontSize: 40,
     fontWeight: '700',
     textAlign: 'center',
     padding: 0,
   },
-  textInput: {
-    minHeight: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
   categoryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.eight,
   },
   categoryChip: {
     minHeight: 40,
@@ -329,7 +326,7 @@ const styles = StyleSheet.create({
     paddingRight: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.eight,
   },
   reflectionToggle: {
     flexDirection: 'row',
@@ -340,12 +337,13 @@ const styles = StyleSheet.create({
   reflectionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.eight,
   },
   reflectionChip: {
+    minHeight: 40,
     borderWidth: 1,
     borderRadius: 18,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.twelve,
+    justifyContent: 'center',
   },
 });

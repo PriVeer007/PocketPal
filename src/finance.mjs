@@ -71,38 +71,65 @@ export function remainingAllowance(allowanceMinor, spentMinor) {
   return Math.max(0, Math.round(allowanceMinor) - Math.round(spentMinor));
 }
 
+export const CYCLE_BUDGET_TOP_UP_SOURCE = 'Allowance';
+
+function sumCycleIncomeTopUps(incomes, cycleStartDate, cycleThroughDate) {
+  if (
+    !Array.isArray(incomes) ||
+    !incomes.some((income) => income?.source === CYCLE_BUDGET_TOP_UP_SOURCE)
+  ) {
+    return 0;
+  }
+
+  const start = localDateKey(cycleStartDate);
+  const through = localDateKey(cycleThroughDate);
+  const seenIncomeIds = new Set();
+  return incomes.reduce((total, income) => {
+    if (income?.source !== CYCLE_BUDGET_TOP_UP_SOURCE) return total;
+    const date = localDateKey(income.occurredAt);
+    if (date < start || date > through) return total;
+    if (Number.isSafeInteger(income.id)) {
+      if (seenIncomeIds.has(income.id)) return total;
+      seenIncomeIds.add(income.id);
+    }
+    const amount = Math.max(0, Number(income.amountMinor) || 0);
+    return total + amount;
+  }, 0);
+}
+
 export function calculateBudgetSummary({
   allowanceMinor = 0,
-  incomeMinor = 0,
+  incomes = [],
+  cycleStartDate,
+  cycleThroughDate,
   expenseMinor = 0,
   savingsReservedMinor = 0,
-  withdrawalsMinor = 0,
   totalCycleDays = 1,
   daysLeft = 1,
   pacingMode = 'adaptive',
   zeroSpendDays = [],
 }) {
   const safeAllowance = Math.max(0, Number(allowanceMinor) || 0);
-  const safeIncome = Math.max(0, Number(incomeMinor) || 0);
+  const incomeTopUpMinor = sumCycleIncomeTopUps(incomes, cycleStartDate, cycleThroughDate);
   const safeExpense = Math.max(0, Number(expenseMinor) || 0);
   const safeSavingsReserved = Math.max(0, Number(savingsReservedMinor) || 0);
-  const safeWithdrawals = Math.max(0, Number(withdrawalsMinor) || 0);
   const safeTotalCycleDays = Math.max(1, Number(totalCycleDays) || 1);
   const safeDaysLeft = Math.max(1, Number(daysLeft) || 1);
   const zeroSpendCount = Array.isArray(zeroSpendDays) ? zeroSpendDays.length : 0;
-  const availableMinor = safeAllowance + safeIncome - safeExpense - safeSavingsReserved + safeWithdrawals;
+  const adjustedCycleBudgetMinor = safeAllowance + incomeTopUpMinor;
+  const availableMinor = adjustedCycleBudgetMinor - safeExpense - safeSavingsReserved;
 
   const dailyRoomMinor =
     pacingMode === 'fixed'
-      ? Math.round((safeAllowance + safeIncome) / safeTotalCycleDays)
+      ? Math.round(adjustedCycleBudgetMinor / safeTotalCycleDays)
       : Math.round(Math.max(0, availableMinor) / safeDaysLeft);
 
   return {
     allowanceMinor: safeAllowance,
-    incomeMinor: safeIncome,
+    incomeTopUpMinor,
+    adjustedCycleBudgetMinor,
     expenseMinor: safeExpense,
     savingsReservedMinor: safeSavingsReserved,
-    withdrawalsMinor: safeWithdrawals,
     availableMinor: Math.max(0, availableMinor),
     remainingMinor: Math.max(0, availableMinor),
     dailyRoomMinor,

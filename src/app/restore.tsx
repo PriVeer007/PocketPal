@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, TextInput } from 'react-native';
-import { ActionButton, AppText, Screen, Surface, usePalette } from '@/components/app-ui';
+import { ActionButton, AppText, Screen, Surface, ui, usePalette } from '@/components/app-ui';
 import { generateBackupJSON, validateBackupPayload } from '@/finance.mjs';
 import { useFinance } from '@/store';
 
@@ -91,6 +91,7 @@ export default function RestoreBackupScreen() {
 
   return (
     <Screen
+      hasBottomNav={false}
       title="Restore backup"
       action={
         <Pressable
@@ -98,6 +99,7 @@ export default function RestoreBackupScreen() {
           accessibilityRole="button"
           accessibilityLabel="Cancel restore"
           hitSlop={8}
+          style={ui.textAction}
         >
           <AppText variant="bodyMedium" color={p.accent} weight="600">
             Cancel
@@ -122,7 +124,7 @@ export default function RestoreBackupScreen() {
           autoCorrect={false}
           placeholder='{"app": "PocketPal", ...}'
           placeholderTextColor={p.textSecondary}
-          style={[styles.input, { color: p.text, backgroundColor: p.backgroundElement, borderColor: p.border }]}
+          style={[ui.input, styles.input, { color: p.text, backgroundColor: p.backgroundElement, borderColor: p.border }]}
           accessibilityLabel="PocketPal backup JSON"
         />
 
@@ -134,7 +136,7 @@ export default function RestoreBackupScreen() {
       </Surface>
 
       {preview ? (
-        <Surface style={{ gap: 8, padding: 16 }}>
+        <Surface style={{ gap: 8 }}>
           <AppText variant="headline">Backup preview</AppText>
           <AppText variant="caption" color={p.textSecondary}>Created: {preview.exportedAt ?? 'Unknown'}</AppText>
           <AppText variant="caption" color={p.textSecondary}>Schema version: {preview.version}</AppText>
@@ -166,10 +168,6 @@ export default function RestoreBackupScreen() {
 const styles = StyleSheet.create({
   input: {
     minHeight: 220,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
     textAlignVertical: 'top',
     fontSize: 13,
   },

@@ -29,6 +29,7 @@ import {
   weeklySpendTrend,
 } from '@/finance.mjs';
 import { useFinance } from '@/store';
+import { Spacing } from '@/constants/theme';
 
 type InsightTab = 'overview' | 'behaviour' | 'trends';
 type Granularity = 'daily' | 'weekly' | 'monthly';
@@ -136,7 +137,7 @@ export default function InsightsScreen() {
   }, [breakdown]);
 
   return (
-    <AppScaffold>
+    <AppScaffold showFloatingAdd={false}>
       <Screen eyebrow="Patterns & habits" title="Insights">
         {/* Main Section Navigation: Overview | Behaviour | Trends */}
         <View style={styles.topTabsContainer}>
@@ -213,8 +214,8 @@ export default function InsightsScreen() {
         {activeTab === 'overview' ? (
           <>
             {/* Card 1: Your Spending Style */}
-            <Surface style={{ padding: 18, gap: 10 }}>
-              <View style={[ui.row, { gap: 14 }]}>
+            <Surface style={{ gap: Spacing.eight }}>
+              <View style={[ui.row, { gap: Spacing.twelve }]}>
                 <View
                   style={{
                     width: 44,
@@ -235,7 +236,7 @@ export default function InsightsScreen() {
                     tintColor={p.accent}
                   />
                 </View>
-                <View style={{ flex: 1, gap: 2 }}>
+                <View style={{ flex: 1, gap: Spacing.two }}>
                   <AppText variant="caption" color={p.textSecondary}>
                     Your Spending Style
                   </AppText>
@@ -287,9 +288,9 @@ export default function InsightsScreen() {
             </Surface>
 
             {/* Card 2: Top Categories with Donut-style Circular Graphic */}
-            <Surface style={{ padding: 18, gap: 16 }}>
+            <Surface style={{ gap: Spacing.sixteen }}>
               <View style={[ui.row, { justifyContent: 'space-between' }]}>
-                <View style={[ui.row, { gap: 8 }]}>
+                <View style={[ui.row, { gap: Spacing.eight }]}>
                   <SymbolView
                     name={{ ios: 'calendar', android: 'calendar_today', web: 'calendar_today' }}
                     size={18}
@@ -303,7 +304,7 @@ export default function InsightsScreen() {
               </View>
 
               {breakdown.length > 0 ? (
-                <View style={[ui.row, { gap: 20, alignItems: 'center' }]}>
+                <View style={[ui.row, { gap: Spacing.sixteen, alignItems: 'center' }]}>
                   {/* Circular Total Indicator (Donut style) */}
                   <CategoryDonut segments={breakdown} size={110}>
                     <AppText variant="captionMedium" weight="700" tabular size={13}>
@@ -315,10 +316,10 @@ export default function InsightsScreen() {
                   </CategoryDonut>
 
                   {/* Category percentage list */}
-                  <View style={{ flex: 1, gap: 10 }}>
+                  <View style={{ flex: 1, gap: Spacing.eight }}>
                     {breakdown.map((item) => (
                       <View key={item.category} style={[ui.row, { justifyContent: 'space-between' }]}>
-                        <View style={[ui.row, { gap: 8 }]}>
+                        <View style={[ui.row, { gap: Spacing.eight }]}>
                           <View
                             style={{
                               width: 8,
@@ -372,7 +373,7 @@ export default function InsightsScreen() {
             ) : null}
 
             {/* Detailed Category Breakdown */}
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: Spacing.twelve }}>
               <SectionTitle title="Full breakdown" detail="All categories in this period" />
               <CategoryBreakdownList breakdown={breakdown} currency={preferences.currency} />
             </View>
@@ -382,7 +383,7 @@ export default function InsightsScreen() {
         {/* TAB 2: BEHAVIOUR */}
         {activeTab === 'behaviour' ? (
           <>
-            <Surface style={{ padding: 18, gap: 12 }}>
+            <Surface style={{ gap: Spacing.twelve }}>
               <AppText variant="headline">Mindful vs. Impulse Spending</AppText>
               <AppText variant="body" color={p.textSecondary}>
                 PocketPal encourages noticing how purchases feel without guilt.
@@ -407,14 +408,14 @@ export default function InsightsScreen() {
             </Surface>
 
             {/* Reflection distribution */}
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: Spacing.twelve }}>
               <SectionTitle title="Observed Reflections" detail="Counts recorded across entries" />
-              <Surface style={{ gap: 12 }}>
+              <Surface style={{ gap: Spacing.twelve }}>
                 {(['Planned', 'Needed', 'Spontaneous', 'Just wanted it'] as const).map((ref) => {
                   const count = mindfulStats.counts[ref] ?? 0;
                   const ratio = mindfulStats.totalReflections > 0 ? count / mindfulStats.totalReflections : 0;
                   return (
-                    <View key={ref} style={{ gap: 6 }}>
+                    <View key={ref} style={{ gap: Spacing.eight }}>
                       <View style={[ui.row, { justifyContent: 'space-between' }]}>
                         <AppText variant="bodyMedium" weight="600">
                           {ref}
@@ -436,7 +437,7 @@ export default function InsightsScreen() {
         {activeTab === 'trends' ? (
           <>
             {/* Spending Trend with Daily / Weekly / Monthly Switch */}
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: Spacing.twelve }}>
               <SectionTitle
                 title="Spending trend"
                 detail="Interactive chart with date and amount inspection"
@@ -451,7 +452,7 @@ export default function InsightsScreen() {
             </View>
 
             {/* Calendar Heatmap with Red, Yellow, Green upon spending */}
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: Spacing.twelve }}>
               <SectionTitle
                 title="Calendar & heat map"
                 detail="Daily spend intensity: Red (high), Yellow (moderate), Green (low/zero)"
@@ -480,15 +481,15 @@ const styles = StyleSheet.create({
   },
   rangeSelector: {
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.eight,
   },
   rangeChip: {
     flex: 1,
-    minHeight: 34,
+    minHeight: 36,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: Spacing.eight,
   },
 });

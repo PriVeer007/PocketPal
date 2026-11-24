@@ -1,6 +1,3 @@
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import {
   ActionButton,
   AppScaffold,
@@ -19,6 +16,10 @@ import {
   toMinorUnits,
 } from '@/finance.mjs';
 import { CATEGORIES, Category, useFinance } from '@/store';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Alert, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
+import { Spacing } from '@/constants/theme';
 
 function formatMinorToInput(minor: number, currency: string) {
   const digits = currencyDigits(currency);
@@ -162,11 +163,11 @@ export default function ProfileScreen() {
   };
 
   return (
-    <AppScaffold>
+    <AppScaffold showFloatingAdd={false}>
       <Screen eyebrow="Your setup" title="Profile & settings">
         {/* Profile Card */}
-        <Surface style={{ padding: 18 }}>
-          <View style={[ui.row, { gap: 14 }]}>
+        <Surface>
+          <View style={[ui.row, { gap: Spacing.twelve }]}>
             <View
               style={[
                 styles.avatarLarge,
@@ -181,7 +182,7 @@ export default function ProfileScreen() {
               </AppText>
             </View>
 
-            <View style={{ flex: 1, gap: 6 }}>
+            <View style={{ flex: 1, gap: Spacing.eight }}>
               <AppText variant="eyebrow" color={p.textSecondary}>
                 STUDENT PROFILE
               </AppText>
@@ -202,6 +203,8 @@ export default function ProfileScreen() {
                     void saveName();
                   }}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  style={ui.textAction}
                 >
                   <AppText variant="captionMedium" color={p.accent}>
                     Save
@@ -219,7 +222,7 @@ export default function ProfileScreen() {
         {notice || error ? (
           <Surface
             style={{
-              padding: 12,
+              padding: Spacing.twelve,
               backgroundColor: error ? (p.warning + '22') : p.accentSoft,
               borderColor: error ? p.warning : p.accent,
             }}
@@ -231,13 +234,13 @@ export default function ProfileScreen() {
         ) : null}
 
         {/* Allowance & Cycle */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle title="Allowance cycle" detail="The amount you plan your everyday spending around" />
-          <Surface style={{ gap: 12 }}>
+          <Surface style={{ gap: Spacing.twelve }}>
             <AppText variant="eyebrow" color={p.textSecondary}>
               MONTHLY ALLOWANCE ({preferences.currency})
             </AppText>
-            <View style={[ui.row, { gap: 10 }]}>
+            <View style={[ui.row, { gap: Spacing.eight }]}>
               <TextInput
                 value={allowance}
                 onChangeText={(v) => {
@@ -246,6 +249,7 @@ export default function ProfileScreen() {
                 }}
                 keyboardType="decimal-pad"
                 style={[
+                  ui.input,
                   styles.allowanceInput,
                   {
                     color: p.text,
@@ -263,7 +267,7 @@ export default function ProfileScreen() {
               />
             </View>
 
-            <View style={{ gap: 8, marginTop: 4 }}>
+            <View style={{ gap: Spacing.eight, marginTop: Spacing.four }}>
               <AppText variant="caption" color={p.textSecondary}>
                 Cycle reset day of each month
               </AppText>
@@ -301,18 +305,18 @@ export default function ProfileScreen() {
         </View>
 
         {/* Category Budgets */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
             title="Category budgets"
             detail="Optional guardrails for categories that matter to you"
           />
-          <Surface style={{ gap: 16 }}>
+          <Surface style={{ gap: Spacing.sixteen }}>
             {CATEGORIES.map((cat) => (
-              <View key={cat} style={{ gap: 6 }}>
+              <View key={cat} style={{ gap: Spacing.eight }}>
                 <AppText variant="bodyMedium" weight="600">
                   {cat}
                 </AppText>
-                <View style={[ui.row, { gap: 10 }]}>
+                <View style={[ui.row, { gap: Spacing.eight }]}>
                   <TextInput
                     value={budgetDrafts[cat] ?? '0'}
                     onChangeText={(v) =>
@@ -325,6 +329,7 @@ export default function ProfileScreen() {
                     placeholder="0"
                     placeholderTextColor={p.textSecondary}
                     style={[
+                      ui.input,
                       styles.categoryBudgetInput,
                       {
                         color: p.text,
@@ -348,7 +353,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Appearance Mode */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle title="Appearance" detail="Follows system appearance by default" />
           <Surface style={styles.appearanceRow}>
             {(['system', 'light', 'dark'] as const).map((mode) => {
@@ -382,12 +387,12 @@ export default function ProfileScreen() {
         </View>
 
         {/* Daily Budget Pacing Mode */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
             title="Daily budget pacing"
             detail="Choose how unspent daily allowance is handled"
           />
-          <Surface style={{ gap: 12 }}>
+          <Surface style={{ gap: Spacing.twelve }}>
             <View style={styles.appearanceRow}>
               {(
                 [
@@ -420,7 +425,7 @@ export default function ProfileScreen() {
               })}
             </View>
 
-            <Surface style={{ padding: 14, gap: 6, backgroundColor: p.accentSoft, borderColor: p.accentSoft }}>
+            <Surface style={{ gap: Spacing.eight, backgroundColor: p.accentSoft, borderColor: p.accentSoft }}>
               <AppText variant="captionMedium" color={p.accent}>
                 {pendingPacingMode === 'adaptive' ? 'HOW ADAPTIVE WORKS' : 'HOW FIXED WORKS'}
               </AppText>
@@ -448,7 +453,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Currency Protection Info */}
-        <Surface style={{ padding: 16, gap: 4 }}>
+        <Surface style={{ gap: Spacing.four }}>
           <AppText variant="headline">Currency &amp; records</AppText>
           <AppText variant="body" color={p.textSecondary}>
             Active currency: {preferences.currency}. Currency is locked once configured to prevent historical transaction records from being silently reinterpreted with different exchange units.
@@ -456,10 +461,10 @@ export default function ProfileScreen() {
         </Surface>
 
         {/* About Section */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle title="About PocketPal" detail="Created for mindful student finance" />
-          <Surface style={{ padding: 18, gap: 12 }}>
-            <View style={[ui.row, { gap: 10 }]}>
+          <Surface style={{ gap: Spacing.twelve }}>
+            <View style={[ui.row, { gap: Spacing.eight }]}>
               <View
                 style={{
                   width: 36,
@@ -471,7 +476,7 @@ export default function ProfileScreen() {
                 }}
               >
                 <AppText variant="headline" color={onAccent} size={18}>
-                  p
+                  P
                 </AppText>
               </View>
               <View style={{ flex: 1 }}>
@@ -502,15 +507,15 @@ export default function ProfileScreen() {
               </AppText>
             </View>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.eight, marginTop: Spacing.four }}>
               {['100% Offline SQLite', 'Zero Cloud Telemetry', 'No Bank Credentials', 'Open Architecture'].map((badge) => (
                 <View
                   key={badge}
                   style={{
                     backgroundColor: p.accentSoft,
                     borderRadius: 10,
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
+                    paddingHorizontal: Spacing.eight,
+                    paddingVertical: Spacing.four,
                   }}
                 >
                   <AppText variant="captionMedium" color={p.accent} size={11}>
@@ -523,13 +528,13 @@ export default function ProfileScreen() {
         </View>
 
         {/* Data Portability & Backup */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
             title="Data & offline backup"
             detail="Export your records anytime or create portable backups"
           />
-          <Surface style={{ gap: 12 }}>
-            <View style={{ gap: 4 }}>
+          <Surface style={{ gap: Spacing.twelve }}>
+            <View style={{ gap: Spacing.four }}>
               <AppText variant="headline">Export spreadsheet (CSV)</AppText>
               <AppText variant="caption" color={p.textSecondary}>
                 Open your spending history in Excel, Google Sheets, or Numbers.
@@ -543,9 +548,9 @@ export default function ProfileScreen() {
               }}
             />
 
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginVertical: 4 }} />
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginVertical: Spacing.four }} />
 
-            <View style={{ gap: 4 }}>
+            <View style={{ gap: Spacing.four }}>
               <AppText variant="headline">Full database backup (JSON)</AppText>
               <AppText variant="caption" color={p.textSecondary}>
                 Save an offline snapshot of your preferences, spends, and goals.
@@ -567,9 +572,9 @@ export default function ProfileScreen() {
               }}
             />
 
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginVertical: 4 }} />
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginVertical: Spacing.four }} />
 
-            <View style={{ gap: 4 }}>
+            <View style={{ gap: Spacing.four }}>
               <AppText variant="headline">Reset all records</AppText>
               <AppText variant="caption" color={p.textSecondary}>
                 Clear all SQLite data and start fresh for a new semester.
@@ -580,10 +585,10 @@ export default function ProfileScreen() {
         </View>
 
         {/* Privacy & Storage Transparency */}
-        <Surface style={{ padding: 16, gap: 4 }}>
+        <Surface style={{ gap: Spacing.four }}>
           <AppText variant="headline">Private by design</AppText>
           <AppText variant="body" color={p.textSecondary}>
-            {expenses.length} {expenses.length === 1 ? 'expense' : 'expenses'} and             {goals.length}{' '}
+            {expenses.length} {expenses.length === 1 ? 'expense' : 'expenses'} and {goals.length}{' '}
             {goals.length === 1 ? 'goal is' : 'goals are'} active in SQLite directly on this device. PocketPal does not connect to banks, cloud services, or external trackers.
           </AppText>
         </Surface>
@@ -609,34 +614,34 @@ const styles = StyleSheet.create({
   },
   allowanceInput: {
     flex: 1,
-    height: 46,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
+    minHeight: 48,
+    borderRadius: 14,
+    paddingHorizontal: Spacing.twelve,
     fontSize: 16,
   },
   cycleChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.eight,
   },
   cycleChip: {
     borderRadius: 16,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    minHeight: 36,
+    paddingHorizontal: Spacing.twelve,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryBudgetInput: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
+    minHeight: 48,
+    borderRadius: 14,
+    paddingHorizontal: Spacing.twelve,
     fontSize: 14,
   },
   appearanceRow: {
     flexDirection: 'row',
-    gap: 6,
-    padding: 6,
+    gap: Spacing.eight,
+    padding: Spacing.eight,
   },
   appearanceOption: {
     flex: 1,

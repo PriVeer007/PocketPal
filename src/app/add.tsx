@@ -15,16 +15,18 @@ import {
   CategoryMark,
   Screen,
   Surface,
+  ui,
   useAccentForeground,
   usePalette,
 } from '@/components/app-ui';
-import { localDateKey, toMinorUnits, validateExpense } from '@/finance.mjs';
+import { CYCLE_BUDGET_TOP_UP_SOURCE, localDateKey, toMinorUnits, validateExpense } from '@/finance.mjs';
 import { CATEGORIES, Category, Reflection, useFinance } from '@/store';
+import { Spacing } from '@/constants/theme';
 
 const reflections: readonly Reflection[] = ['Planned', 'Spontaneous', 'Needed', 'Just wanted it'] as const;
 
 type EntryMode = 'expense' | 'income';
-const INCOME_SOURCES = ['Allowance', 'Scholarship', 'Part-time work', 'Freelance', 'Other'] as const;
+const INCOME_SOURCES = [CYCLE_BUDGET_TOP_UP_SOURCE, 'Scholarship', 'Part-time work', 'Freelance', 'Other'] as const;
 
 export default function AddExpenseScreen() {
   const p = usePalette();
@@ -179,6 +181,7 @@ export default function AddExpenseScreen() {
     >
       <Screen
         scroll={false}
+        hasBottomNav={false}
         title={entryMode === 'income' ? 'Add income' : 'Add spend'}
         action={
           <Pressable
@@ -186,6 +189,7 @@ export default function AddExpenseScreen() {
             accessibilityRole="button"
             accessibilityLabel="Cancel"
             hitSlop={8}
+            style={ui.textAction}
           >
             <AppText variant="bodyMedium" weight="600" color={p.accent}>
               Cancel
@@ -195,7 +199,7 @@ export default function AddExpenseScreen() {
       >
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={{ paddingBottom: 48, gap: 18 }}
+          contentContainerStyle={{ paddingBottom: 32, gap: 16 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -240,7 +244,7 @@ export default function AddExpenseScreen() {
           </View>
 
           {/* Quick Date Selector */}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flexDirection: 'row', gap: Spacing.eight }}>
             {[
               { id: 0 as const, label: 'Today' },
               { id: 1 as const, label: 'Yesterday' },
@@ -254,6 +258,7 @@ export default function AddExpenseScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   style={[
+                    ui.chip,
                     styles.dateChip,
                     {
                       backgroundColor: active ? p.accent : p.backgroundSelected,
@@ -302,11 +307,11 @@ export default function AddExpenseScreen() {
           {!isZeroLog ? (
             <>
               {/* Amount Card */}
-              <Surface style={{ alignItems: 'center', paddingVertical: 20, gap: 6 }}>
+              <Surface style={{ alignItems: 'center', paddingVertical: Spacing.twenty, gap: Spacing.eight }}>
                 <AppText variant="eyebrow" color={p.textSecondary}>
                   AMOUNT ({preferences.currency})
                 </AppText>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.eight }}>
                   <AppText variant="display" color={p.textSecondary} size={32}>
                     {currencySymbol}
                   </AppText>
@@ -342,7 +347,7 @@ export default function AddExpenseScreen() {
                   maxLength={80}
                   returnKeyType="done"
                   style={[
-                    styles.textInput,
+                    ui.input,
                     {
                       color: p.text,
                       borderColor: p.border,
@@ -358,7 +363,7 @@ export default function AddExpenseScreen() {
                 <AppText variant="captionMedium">
                   {entryMode === 'income' ? 'Source type' : 'Category'}
                 </AppText>
-                <View style={styles.categoryRow}>
+                <View style={[styles.categoryRow, entryMode === 'income' && styles.incomeSourceRow]}>
                   {(entryMode === 'income' ? INCOME_SOURCES : CATEGORIES).map((option) => {
                     const active = entryMode === 'income' ? incomeSource === option : category === option;
                     return (
@@ -372,6 +377,8 @@ export default function AddExpenseScreen() {
                         accessibilityState={{ selected: active }}
                         style={[
                           styles.categoryChip,
+                          entryMode === 'expense' && styles.expenseCategoryChip,
+                          entryMode === 'income' && styles.incomeSourceChip,
                           {
                             backgroundColor: active ? p.accentSoft : p.backgroundElement,
                             borderColor: active ? p.accent : p.border,
@@ -460,9 +467,9 @@ export default function AddExpenseScreen() {
                           }, 300);
                         }}
                         style={[
-                          styles.textInput,
+                          ui.input,
                           {
-                            minHeight: 46,
+                            minHeight: 48,
                             color: p.text,
                             borderColor: p.border,
                             backgroundColor: p.backgroundElement,
@@ -506,34 +513,37 @@ export default function AddExpenseScreen() {
 
 const styles = StyleSheet.create({
   amountInput: {
-    minWidth: 140,
+    flex: 1,
+    minWidth: 0,
     fontSize: 40,
     fontWeight: '700',
     textAlign: 'center',
     padding: 0,
   },
-  textInput: {
-    minHeight: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
   categoryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.eight,
   },
   categoryChip: {
     minHeight: 40,
     borderWidth: 1,
     borderRadius: 20,
-    paddingLeft: 6,
-    paddingRight: 14,
+    paddingHorizontal: Spacing.twelve,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.eight,
+  },
+  expenseCategoryChip: {
+    paddingLeft: Spacing.four,
+    paddingRight: Spacing.twelve,
+  },
+  incomeSourceRow: {
+    justifyContent: 'center',
+  },
+  incomeSourceChip: {
+    flexShrink: 0,
+    justifyContent: 'center',
   },
   reflectionToggle: {
     flexDirection: 'row',
@@ -544,17 +554,17 @@ const styles = StyleSheet.create({
   reflectionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.eight,
   },
   reflectionChip: {
+    minHeight: 40,
     borderWidth: 1,
     borderRadius: 18,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.twelve,
+    justifyContent: 'center',
   },
   dateChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    flex: 1,
     borderRadius: 16,
   },
   modeToggleContainer: {
@@ -564,11 +574,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: 20,
     padding: 3,
-    gap: 2,
+    gap: Spacing.two,
   },
   modeToggleBtn: {
-    paddingHorizontal: 22,
-    paddingVertical: 9,
+    paddingHorizontal: Spacing.twenty,
+    paddingVertical: Spacing.eight,
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
@@ -578,8 +588,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 14,
-    padding: 14,
-    gap: 12,
+    padding: Spacing.sixteen,
+    gap: Spacing.twelve,
   },
   checkCircle: {
     width: 22,

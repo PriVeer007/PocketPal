@@ -5,22 +5,24 @@ export function localDateKey(value: string | Date | number): string;
 export function cycleStart(value: string | Date | number, cycleStartDay?: number): Date;
 export function nextCycleStart(value: string | Date | number, cycleStartDay?: number): Date;
 export function remainingAllowance(allowanceMinor: number, spentMinor: number): number;
+export const CYCLE_BUDGET_TOP_UP_SOURCE: 'Allowance';
 export function calculateBudgetSummary(params: {
   allowanceMinor?: number;
-  incomeMinor?: number;
+  incomes?: Array<{ id?: number; amountMinor: number; source: string; occurredAt: string }>;
+  cycleStartDate?: string | Date | number;
+  cycleThroughDate?: string | Date | number;
   expenseMinor?: number;
   savingsReservedMinor?: number;
-  withdrawalsMinor?: number;
   totalCycleDays?: number;
   daysLeft?: number;
   pacingMode?: 'adaptive' | 'fixed';
   zeroSpendDays?: Array<string | { dateKey: string }>;
 }): {
   allowanceMinor: number;
-  incomeMinor: number;
+  incomeTopUpMinor: number;
+  adjustedCycleBudgetMinor: number;
   expenseMinor: number;
   savingsReservedMinor: number;
-  withdrawalsMinor: number;
   availableMinor: number;
   remainingMinor: number;
   dailyRoomMinor: number;

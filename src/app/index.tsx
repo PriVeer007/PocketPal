@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import {
@@ -20,6 +20,7 @@ import {
   allowanceProgress,
   calculateBudgetSummary,
   buildActivityRecords,
+  categoryColor,
   cycleStart,
   dailySpendTrend,
   formatMoney,
@@ -31,6 +32,7 @@ import {
 } from '@/finance.mjs';
 import type { ActivityRecord } from '@/finance.mjs';
 import { useFinance } from '@/store';
+import { Spacing } from '@/constants/theme';
 
 function ActivityRow({ record, currency }: { record: ActivityRecord; currency: string }) {
   const p = usePalette();
@@ -55,7 +57,7 @@ function ActivityRow({ record, currency }: { record: ActivityRecord; currency: s
     : `${record.goalName ?? 'Savings goal'} · ${time}`;
 
   return (
-    <View style={[ui.row, { gap: 12 }]}>
+    <View style={[ui.row, { gap: Spacing.twelve }]}>
       {isExpense && record.category ? (
         <CategoryMark category={record.category} size={36} />
       ) : (
@@ -73,7 +75,7 @@ function ActivityRow({ record, currency }: { record: ActivityRecord; currency: s
           />
         </View>
       )}
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, gap: Spacing.two }}>
         <AppText variant="bodyMedium" weight="600" numberOfLines={1}>
           {title}
         </AppText>
@@ -94,7 +96,13 @@ const CATEGORIES_FOR_DASHBOARD = ['Food', 'Transport', 'Study', 'Social', 'Shopp
 export default function Dashboard() {
   const p = usePalette();
   const { preferences, expenses, incomes, goals, goalRecords, goalTransactions, budgets, zeroSpendDays } = useFinance();
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const nextDay = new Date();
+    nextDay.setHours(24, 0, 0, 0);
+    const timeout = setTimeout(() => setNow(new Date()), nextDay.getTime() - Date.now() + 1);
+    return () => clearTimeout(timeout);
+  }, [now]);
   const mode = useThemeMode();
   const onDark = mode === 'dark';
 
@@ -105,15 +113,6 @@ export default function Dashboard() {
   }, [now, preferences.cycleStartDay]);
 
   const spent = useMemo(() => sumExpenses(expenses, start, now), [expenses, start, now]);
-  const incomeMinor = useMemo(
-    () =>
-      incomes.reduce(
-        (total, item) =>
-          total + (item.occurredAt >= start.toISOString() && item.occurredAt <= now.toISOString() ? item.amountMinor : 0),
-        0
-      ),
-    [incomes, start, now]
-  );
   const goalBalances = useMemo(() => reconcileGoalBalances(goals, goalTransactions), [goals, goalTransactions]);
   const savingsReservedMinor = useMemo(
     () => Object.values(goalBalances).reduce((total, amount) => total + Number(amount || 0), 0),
@@ -131,7 +130,9 @@ export default function Dashboard() {
     () =>
       calculateBudgetSummary({
         allowanceMinor: preferences.allowanceMinor,
-        incomeMinor,
+        incomes,
+        cycleStartDate: start,
+        cycleThroughDate: now,
         expenseMinor: spent,
         savingsReservedMinor,
         totalCycleDays,
@@ -139,9 +140,11 @@ export default function Dashboard() {
         pacingMode: preferences.pacingMode,
         zeroSpendDays,
       }),
-    [preferences.allowanceMinor, incomeMinor, spent, savingsReservedMinor, totalCycleDays, daysLeft, preferences.pacingMode, zeroSpendDays]
+    [preferences.allowanceMinor, incomes, start, now, spent, savingsReservedMinor, totalCycleDays, daysLeft, preferences.pacingMode, zeroSpendDays]
   );
-  const remaining = budgetSummary.remainingMinor;
+  const remaining = budgetSummary.availableMinor;
+  const hasIncomeTopUp = budgetSummary.incomeTopUpMinor > 0;
+  const updatedColor = onDark ? '#74D69E' : '#59CA89';
   const daysElapsed = useMemo(
     () => Math.max(1, Math.ceil((now.getTime() - start.getTime()) / 86400000)),
     [now, start]
@@ -217,25 +220,46 @@ export default function Dashboard() {
           </AppText>
 
           <ProgressBar
-            value={allowanceProgress(spent, preferences.allowanceMinor)}
+            value={allowanceProgress(spent, budgetSummary.adjustedCycleBudgetMinor)}
             color={onDark ? p.accent : '#FFFFFF'}
             trackColor={onDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.3)'}
           />
 
           <View style={[ui.row, { justifyContent: 'space-between' }]}>
             <AppText variant="captionMedium" color={heroSub} tabular>
-              {formatMoney(spent, preferences.currency)} spent of {formatMoney(preferences.allowanceMinor, preferences.currency)}
+              {formatMoney(spent, preferences.currency)} spent of {formatMoney(budgetSummary.adjustedCycleBudgetMinor, preferences.currency)}
             </AppText>
             <AppText variant="captionMedium" color={heroSub}>
               {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
             </AppText>
           </View>
+
+          {hasIncomeTopUp ? (
+            <>
+              <View style={styles.heroDivider} />
+              <View style={styles.budgetBreakdown}>
+                <AppText
+                  variant="caption"
+                  color={heroSub}
+                  style={styles.budgetBreakdownLabel}
+                >
+                  Base {formatMoney(budgetSummary.allowanceMinor, preferences.currency)} + Extra{' '}
+                  {formatMoney(budgetSummary.incomeTopUpMinor, preferences.currency)}
+                </AppText>
+                <View style={[styles.updatedBadge, { borderColor: updatedColor }]}>
+                  <AppText variant="captionMedium" color={updatedColor}>
+                    Updated
+                  </AppText>
+                </View>
+              </View>
+            </>
+          ) : null}
         </Surface>
 
         {/* Pace & Room Metrics */}
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={styles.metricRow}>
           <Surface
-            style={{ flex: 1, padding: 16 }}
+            style={styles.metricCard}
             onPress={() => router.push('/profile')}
             accessibilityLabel="Adjust daily pacing in profile"
           >
@@ -250,7 +274,7 @@ export default function Dashboard() {
             </AppText>
           </Surface>
 
-          <Surface style={{ flex: 1, padding: 16 }}>
+          <Surface style={styles.metricCard}>
             <AppText variant="caption" color={p.textSecondary}>
               Daily average
             </AppText>
@@ -267,7 +291,7 @@ export default function Dashboard() {
         <StreakCard expenses={expenses} />
 
         {/* Spending Trend Graph */}
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
             title="Spending trend"
             detail="Daily spending recorded this cycle"
@@ -284,7 +308,7 @@ export default function Dashboard() {
         </View>
 
         {/* Category Guardrails */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
             title="Category budgets"
             detail="Limits to keep spending in perspective"
@@ -308,10 +332,10 @@ export default function Dashboard() {
               const warning = progress >= 0.9;
 
               return (
-                <Surface key={category} style={{ padding: 14 }}>
-                  <View style={[ui.row, { gap: 12 }]}>
+                <Surface key={category}>
+                  <View style={[ui.row, { gap: Spacing.twelve }]}>
                     <CategoryMark category={category} size={36} />
-                    <View style={{ flex: 1, gap: 6 }}>
+                    <View style={{ flex: 1, gap: Spacing.eight }}>
                       <View style={[ui.row, { justifyContent: 'space-between' }]}>
                         <AppText variant="bodyMedium" weight="600">
                           {category}
@@ -320,14 +344,14 @@ export default function Dashboard() {
                           {formatMoney(value, preferences.currency)} / {formatMoney(cap, preferences.currency)}
                         </AppText>
                       </View>
-                      <ProgressBar value={progress} color={warning ? p.warning : p.accent} height={6} />
+                      <ProgressBar value={progress} color={categoryColor(category)} height={6} />
                     </View>
                   </View>
                 </Surface>
               );
             })
           ) : (
-            <Surface style={{ padding: 18, backgroundColor: p.accentSoft, borderColor: p.accentSoft, gap: 8 }}>
+            <Surface style={{ backgroundColor: p.accentSoft, borderColor: p.accentSoft, gap: Spacing.eight }}>
               <AppText variant="headline">Set your first category limit</AppText>
               <AppText variant="body" color={p.textSecondary}>
                 Choose a category like Food or Social to set a boundary that leaves room to live.
@@ -347,14 +371,14 @@ export default function Dashboard() {
         </View>
 
         {/* Recent Activity */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
             title="Recent activity"
             actionLabel={recent.length ? 'See all' : undefined}
             onPress={() => router.push('/activity')}
           />
           {recent.length ? (
-            <Surface style={{ padding: 16 }}>
+            <Surface>
               {recent.map((record, idx) => (
                 <View key={record.key}>
                   <ActivityRow record={record} currency={preferences.currency} />
@@ -365,7 +389,7 @@ export default function Dashboard() {
               ))}
             </Surface>
           ) : (
-            <Surface style={{ padding: 20, gap: 6 }}>
+            <Surface style={{ gap: Spacing.eight }}>
               <AppText variant="headline">No activity recorded yet</AppText>
               <AppText variant="body" color={p.textSecondary}>
                 Your expenses, income, and savings updates will appear here.
@@ -388,13 +412,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroCard: {
-    padding: 22,
-    borderRadius: 22,
-    gap: 16,
+    padding: Spacing.twenty,
+    borderRadius: 18,
+    gap: Spacing.sixteen,
+  },
+  heroDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  budgetBreakdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.eight,
+  },
+  budgetBreakdownLabel: {
+    flexShrink: 1,
+  },
+  updatedBadge: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: Spacing.eight,
+    paddingVertical: Spacing.two,
+    flexShrink: 0,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: Spacing.twelve,
+  },
+  metricCard: {
+    flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    marginVertical: 12,
+    marginVertical: Spacing.twelve,
     marginLeft: 48,
   },
   activityIcon: {

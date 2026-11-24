@@ -1,7 +1,7 @@
 import { router, usePathname } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { SymbolViewProps } from 'expo-symbols';
-import React, { PropsWithChildren, useMemo, useState } from 'react';
+import React, { createContext, PropsWithChildren, useContext, useMemo, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -15,10 +15,15 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
-import { ColorPalette, Colors, Fonts, ThemeMode, Typography } from '@/constants/theme';
+import { ColorPalette, Colors, Fonts, Spacing, ThemeMode, Typography } from '@/constants/theme';
 import { calculateLoggingStreak, categoryColor, currencyDigits, formatMoney, monthCalendarData } from '@/finance.mjs';
 import { Category, Expense, useFinance } from '@/store';
 import { MotionBar, MotionPressable, MotionProgress, ScreenMotion } from '@/components/motion';
+
+const BOTTOM_NAV_HEIGHT = 64;
+const FLOATING_ADD_SIZE = 52;
+const FLOATING_ADD_GAP = Spacing.eight;
+const ScaffoldFloatingAddContext = createContext(false);
 
 export function useThemeMode(): ThemeMode {
   const { preferences } = useFinance();
@@ -86,15 +91,27 @@ export function Screen({
   eyebrow,
   action,
   scroll = true,
+  hasBottomNav = true,
 }: PropsWithChildren<{
   title?: string;
   eyebrow?: string;
   action?: React.ReactNode;
   scroll?: boolean;
+  hasBottomNav?: boolean;
 }>) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
-  const bottomPadding = Math.max(16, insets.bottom) + 84;
+  const showFloatingAdd = useContext(ScaffoldFloatingAddContext);
+  const bottomClearance = hasBottomNav
+    ? Math.max(Spacing.eight, insets.bottom) +
+      BOTTOM_NAV_HEIGHT +
+      Spacing.twelve +
+      (showFloatingAdd ? FLOATING_ADD_GAP + FLOATING_ADD_SIZE : 0)
+    : 0;
+  const bottomPadding = hasBottomNav
+    ? Spacing.sixteen
+    : Math.max(Spacing.sixteen, insets.bottom) + Spacing.sixteen;
+  const scrollContentBottomPadding = bottomPadding + bottomClearance;
 
   const content = (
     <View style={styles.screenContent}>
@@ -113,9 +130,7 @@ export function Screen({
           {action}
         </ScreenMotion>
       ) : null}
-      <ScreenMotion>
-        {children}
-      </ScreenMotion>
+      <ScreenMotion style={styles.screenBody}>{children}</ScreenMotion>
     </View>
   );
 
@@ -123,7 +138,7 @@ export function Screen({
     <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: p.background }]}>
       {scroll ? (
         <ScrollView
-          contentContainerStyle={{ paddingBottom: bottomPadding }}
+          contentContainerStyle={{ paddingBottom: scrollContentBottomPadding }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -147,32 +162,26 @@ export function Surface({
   accessibilityLabel?: string;
 }>) {
   const p = usePalette();
-  const view = (
-    <View
-      style={[
-        styles.surface,
-        {
-          backgroundColor: p.backgroundElement,
-          borderColor: p.border,
-        },
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  );
+  const surfaceStyle = [
+    styles.surface,
+    {
+      backgroundColor: p.backgroundElement,
+      borderColor: p.border,
+    },
+    style,
+  ];
 
   return onPress ? (
     <MotionPressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      style={undefined}
+      style={surfaceStyle}
     >
-      {view}
+      {children}
     </MotionPressable>
   ) : (
-    view
+    <View style={surfaceStyle}>{children}</View>
   );
 }
 
@@ -254,6 +263,7 @@ export function SectionTitle({
           accessibilityLabel={actionLabel}
           onPress={onPress}
           hitSlop={8}
+          style={ui.textAction}
         >
           <AppText variant="captionMedium" color={p.accent}>
             {actionLabel}
@@ -346,7 +356,7 @@ export function BottomNav() {
   const p = usePalette();
   const path = usePathname();
   const insets = useSafeAreaInsets();
-  const bottomOffset = Math.max(10, insets.bottom);
+  const bottomOffset = Math.max(Spacing.eight, insets.bottom);
 
   return (
     <View
@@ -406,7 +416,7 @@ export function FloatingAdd() {
   const p = usePalette();
   const onAccent = useAccentForeground();
   const insets = useSafeAreaInsets();
-  const bottomOffset = Math.max(10, insets.bottom) + 72;
+  const bottomOffset = Math.max(Spacing.eight, insets.bottom) + BOTTOM_NAV_HEIGHT + FLOATING_ADD_GAP;
 
   return (
     <Pressable
@@ -427,13 +437,18 @@ export function FloatingAdd() {
   );
 }
 
-export function AppScaffold({ children }: PropsWithChildren) {
+export function AppScaffold({
+  children,
+  showFloatingAdd = true,
+}: PropsWithChildren<{ showFloatingAdd?: boolean }>) {
   return (
-    <View style={{ flex: 1 }}>
-      {children}
-      <FloatingAdd />
-      <BottomNav />
-    </View>
+    <ScaffoldFloatingAddContext.Provider value={showFloatingAdd}>
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        {children}
+        {showFloatingAdd ? <FloatingAdd /> : null}
+        <BottomNav />
+      </View>
+    </ScaffoldFloatingAddContext.Provider>
   );
 }
 
@@ -459,7 +474,7 @@ export function EmptyState({
           backgroundColor: p.accentSoft,
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 4,
+          marginBottom: 0,
         }}
       >
         <SymbolView
@@ -475,7 +490,7 @@ export function EmptyState({
         {detail}
       </AppText>
       {cta && onPress ? (
-        <View style={{ marginTop: 6 }}>
+        <View style={{ marginTop: Spacing.eight }}>
           <ActionButton label={cta} onPress={onPress} variant="quiet" />
         </View>
       ) : null}
@@ -539,7 +554,7 @@ export function DailySpendTrendChart({
         accessibilityRole="image"
         accessibilityLabel="Empty spending trend chart"
       >
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 20 }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.eight, paddingHorizontal: Spacing.sixteen }}>
           <AppText variant="captionMedium" color={p.textSecondary}>
             No spending recorded in this period
           </AppText>
@@ -645,7 +660,7 @@ export function DailySpendTrendChart({
           </View>
 
           {/* Bar Columns */}
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 3, paddingBottom: 22 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.four, paddingBottom: Spacing.twentyFour }}>
             {trend.map((day, idx) => {
               const isSelected = selectedKey === day.dateKey;
               const isPeak = day.dateKey === peakDay?.dateKey;
@@ -718,12 +733,12 @@ export function CategoryBreakdownList({
   }
 
   return (
-    <Surface style={{ gap: 14 }}>
+    <Surface style={{ gap: Spacing.sixteen }}>
       {breakdown.map((item) => (
-        <View key={item.category} style={{ gap: 8 }}>
-          <View style={[ui.row, { gap: 10 }]}>
+        <View key={item.category} style={{ gap: Spacing.eight }}>
+          <View style={[ui.row, { gap: Spacing.twelve }]}>
             <CategoryMark category={item.category} size={34} />
-            <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ flex: 1, gap: Spacing.two }}>
               <AppText variant="bodyMedium" weight="600">
                 {item.category}
               </AppText>
@@ -811,8 +826,8 @@ export function StreakCard({ expenses }: { expenses: Expense[] }) {
   const streak = useMemo(() => calculateLoggingStreak(expenses, new Date(), zeroSpendDays), [expenses, zeroSpendDays]);
 
   return (
-    <Surface style={{ padding: 16, borderColor: p.border }}>
-      <View style={[ui.row, { gap: 12 }]}>
+    <Surface style={{ borderColor: p.border }}>
+      <View style={[ui.row, { gap: Spacing.twelve }]}>
         <View
           style={{
             width: 44,
@@ -829,8 +844,8 @@ export function StreakCard({ expenses }: { expenses: Expense[] }) {
             tintColor={p.accent}
           />
         </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <View style={[ui.row, { gap: 8 }]}>
+        <View style={{ flex: 1, gap: Spacing.two }}>
+          <View style={[ui.row, { gap: Spacing.eight }]}>
             <AppText variant="headline">
               {streak.currentStreak} {streak.currentStreak === 1 ? 'day' : 'days'} streak
             </AppText>
@@ -838,7 +853,7 @@ export function StreakCard({ expenses }: { expenses: Expense[] }) {
               <View
                 style={{
                   backgroundColor: p.accentSoft,
-                  paddingHorizontal: 8,
+                  paddingHorizontal: Spacing.eight,
                   paddingVertical: 2,
                   borderRadius: 10,
                 }}
@@ -911,7 +926,7 @@ export function ExpenseCalendarHeatmap({
   }, [calData.days, selectedDateKey]);
 
   return (
-    <Surface style={{ padding: 18, gap: 14 }}>
+    <Surface style={{ gap: Spacing.twelve }}>
       {/* Month Navigator */}
       <View style={[ui.row, { justifyContent: 'space-between' }]}>
         <Pressable
@@ -942,7 +957,7 @@ export function ExpenseCalendarHeatmap({
       </View>
 
       {/* Summary strip: zero spend days vs active days */}
-      <View style={[ui.row, { gap: 10 }]}>
+      <View style={[ui.row, { gap: Spacing.eight, flexWrap: 'wrap' }]}>
         <View style={[styles.calPill, { backgroundColor: p.accentSoft }]}>
           <AppText variant="captionMedium" color={p.accent}>
             {calData.zeroSpendDays} {calData.zeroSpendDays === 1 ? 'zero-spend day' : 'zero-spend days'}
@@ -961,20 +976,20 @@ export function ExpenseCalendarHeatmap({
       </View>
 
       {/* Heatmap Color Legend */}
-      <View style={[ui.row, { justifyContent: 'space-between', paddingHorizontal: 4, marginVertical: 2 }]}>
-        <View style={[ui.row, { gap: 6 }]}>
+      <View style={[ui.row, { justifyContent: 'space-between', paddingHorizontal: Spacing.four, marginVertical: Spacing.two }]}>
+        <View style={[ui.row, { gap: Spacing.eight }]}>
           <View style={[styles.legendDot, { backgroundColor: '#22C55E' }]} />
           <AppText variant="caption" color={p.textSecondary} size={11}>
             Zero / Low
           </AppText>
         </View>
-        <View style={[ui.row, { gap: 6 }]}>
+        <View style={[ui.row, { gap: Spacing.eight }]}>
           <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
           <AppText variant="caption" color={p.textSecondary} size={11}>
             Moderate
           </AppText>
         </View>
-        <View style={[ui.row, { gap: 6 }]}>
+        <View style={[ui.row, { gap: Spacing.eight }]}>
           <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
           <AppText variant="caption" color={p.textSecondary} size={11}>
             High spend
@@ -1079,10 +1094,10 @@ export function ExpenseCalendarHeatmap({
       {selectedDay ? (
         <Surface
           style={{
-            padding: 14,
+            padding: Spacing.sixteen,
             backgroundColor: selectedDay.isZeroSpend ? p.accentSoft : p.backgroundElement,
             borderColor: selectedDay.isZeroSpend ? p.accentSoft : p.border,
-            gap: 10,
+            gap: Spacing.twelve,
           }}
         >
           <View style={[ui.row, { justifyContent: 'space-between' }]}>
@@ -1103,9 +1118,9 @@ export function ExpenseCalendarHeatmap({
               Zero expenses logged on this day. Great discipline leaving room in your allowance!
             </AppText>
           ) : (
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: Spacing.eight }}>
               {selectedDay.items.map((item) => (
-                <View key={item.id} style={[ui.row, { gap: 8 }]}>
+                <View key={item.id} style={[ui.row, { gap: Spacing.eight }]}>
                   <CategoryMark category={item.category} size={26} />
                   <AppText variant="captionMedium" style={{ flex: 1 }} numberOfLines={1}>
                     {item.title}
@@ -1125,10 +1140,37 @@ export function ExpenseCalendarHeatmap({
 
 export const ui = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
-  gap8: { gap: 8 },
-  gap12: { gap: 12 },
-  gap16: { gap: 16 },
-  column: { gap: 10 },
+  gap8: { gap: Spacing.eight },
+  gap12: { gap: Spacing.twelve },
+  gap16: { gap: Spacing.sixteen },
+  column: { gap: Spacing.twelve },
+  wrapRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    gap: Spacing.eight,
+  },
+  input: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: Spacing.twelve,
+    paddingVertical: Spacing.eight,
+    fontSize: 15,
+  },
+  chip: {
+    height: 36,
+    flexShrink: 0,
+    paddingHorizontal: Spacing.twelve,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textAction: {
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.four,
+  },
 });
 
 const styles = StyleSheet.create({
@@ -1139,38 +1181,43 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 580,
     alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 20,
+    paddingHorizontal: Spacing.twenty,
+    paddingTop: Spacing.sixteen,
+    gap: Spacing.twenty,
+  },
+  screenBody: {
+    width: '100%',
+    flexDirection: 'column',
+    gap: Spacing.sixteen,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 48,
-    gap: 12,
+    gap: Spacing.twelve,
   },
   eyebrow: {
     letterSpacing: 1.4,
   },
   surface: {
-    padding: 18,
+    padding: Spacing.sixteen,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 18,
-    gap: 12,
+    gap: Spacing.twelve,
   },
   button: {
-    minHeight: 46,
+    minHeight: 48,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: Spacing.sixteen,
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.eight,
   },
   sectionTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.twelve,
   },
   progressTrack: {
     width: '100%',
@@ -1183,9 +1230,9 @@ const styles = StyleSheet.create({
   },
   bottomNav: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    height: 64,
+    left: Spacing.sixteen,
+    right: Spacing.sixteen,
+    height: BOTTOM_NAV_HEIGHT,
     paddingHorizontal: 8,
     flexDirection: 'row',
     borderWidth: StyleSheet.hairlineWidth,
@@ -1199,9 +1246,10 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   tab: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: Spacing.two,
     minWidth: 50,
     minHeight: 50,
   },
@@ -1214,9 +1262,10 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    right: 22,
-    width: 52,
-    height: 52,
+    right: Spacing.twenty,
+    width: FLOATING_ADD_SIZE,
+    height: FLOATING_ADD_SIZE,
+    alignSelf: 'flex-end',
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1228,18 +1277,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   emptyState: {
-    paddingHorizontal: 22,
-    paddingVertical: 28,
+    paddingHorizontal: Spacing.twenty,
+    paddingVertical: Spacing.twentyFour,
     alignItems: 'center',
-    gap: 10,
+    gap: Spacing.eight,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 18,
   },
   chartContainer: {
-    padding: 16,
+    padding: Spacing.sixteen,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    gap: 8,
+    gap: Spacing.eight,
   },
   barColumn: {
     flex: 1,
@@ -1259,15 +1308,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   calNavBtn: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   calPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    minHeight: 36,
+    paddingHorizontal: Spacing.eight,
+    paddingVertical: Spacing.eight,
+    justifyContent: 'center',
     borderRadius: 12,
   },
   calWeekRow: {
@@ -1282,7 +1333,7 @@ const styles = StyleSheet.create({
   calGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 4,
+    gap: Spacing.four,
   },
   calCell: {
     width: '12.8%',
@@ -1317,12 +1368,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 2,
     gap: 4,
-    marginBottom: 8,
+    marginBottom: Spacing.eight,
   },
   chartPeriodBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    minHeight: 36,
+    paddingHorizontal: Spacing.twelve,
     borderRadius: 10,
+    justifyContent: 'center',
   },
   peakBadge: {
     paddingHorizontal: 8,
@@ -1333,7 +1385,7 @@ const styles = StyleSheet.create({
   yAxisColumn: {
     width: 38,
     justifyContent: 'space-between',
-    paddingBottom: 22,
+    paddingBottom: Spacing.twentyFour,
     paddingRight: 6,
     alignItems: 'flex-end',
   },

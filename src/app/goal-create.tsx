@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { ActionButton, AppText, Screen, Surface, usePalette } from '@/components/app-ui';
+import { ActionButton, AppText, Screen, Surface, ui, usePalette } from '@/components/app-ui';
 import { toMinorUnits } from '@/finance.mjs';
 import { useFinance } from '@/store';
 
@@ -40,6 +40,7 @@ export default function CreateGoalScreen() {
 
   return (
     <Screen
+      hasBottomNav={false}
       title="New savings goal"
       action={
         <Pressable
@@ -47,6 +48,7 @@ export default function CreateGoalScreen() {
           accessibilityRole="button"
           accessibilityLabel="Cancel goal creation"
           hitSlop={8}
+          style={ui.textAction}
         >
           <AppText variant="bodyMedium" color={p.accent} weight="600">
             Cancel
@@ -70,7 +72,7 @@ export default function CreateGoalScreen() {
           placeholderTextColor={p.textSecondary}
           maxLength={50}
           style={[
-            styles.input,
+            ui.input,
             {
               color: p.text,
               backgroundColor: p.backgroundElement,
@@ -80,7 +82,7 @@ export default function CreateGoalScreen() {
         />
       </View>
 
-      <Surface style={{ gap: 10 }}>
+      <Surface style={{ gap: 12 }}>
         <AppText variant="captionMedium">Target amount ({preferences.currency})</AppText>
         <TextInput
           value={amount}
@@ -117,13 +119,6 @@ export default function CreateGoalScreen() {
 }
 
 const styles = StyleSheet.create({
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    fontSize: 15,
-  },
   amountInput: {
     fontSize: 32,
     fontWeight: '700',

@@ -10,7 +10,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ActionButton, AppText, Surface, useAccentForeground, usePalette } from '@/components/app-ui';
+import { ActionButton, AppText, Surface, ui, useAccentForeground, usePalette } from '@/components/app-ui';
+import { Spacing } from '@/constants/theme';
 import { ScreenMotion } from '@/components/motion';
 import { toMinorUnits } from '@/finance.mjs';
 import { useFinance } from '@/store';
@@ -104,7 +105,7 @@ export default function OnboardingScreen() {
               placeholderTextColor={p.textSecondary}
               returnKeyType="next"
               style={[
-                styles.textInput,
+                ui.input,
                 {
                   backgroundColor: p.backgroundElement,
                   color: p.text,
@@ -242,12 +243,12 @@ const styles = StyleSheet.create({
   },
   content: {
     width: '100%',
-    maxWidth: 540,
+    maxWidth: 580,
     alignSelf: 'center',
-    paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 36,
-    gap: 18,
+    paddingHorizontal: Spacing.twenty,
+    paddingTop: Spacing.sixteen,
+    paddingBottom: Spacing.thirtyTwo,
+    gap: Spacing.twenty,
   },
   brandMark: {
     width: 44,
@@ -256,29 +257,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  textInput: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    fontSize: 15,
-  },
   currencyRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.eight,
   },
   currencyChip: {
     borderWidth: 1,
     borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    minHeight: 36,
+    paddingHorizontal: Spacing.twelve,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingBottom: 8,
+    gap: Spacing.eight,
+    paddingBottom: Spacing.eight,
     borderBottomWidth: 1,
   },
   amountInput: {
@@ -290,11 +286,13 @@ const styles = StyleSheet.create({
   cycleRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.eight,
   },
   cycleChip: {
     borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    minHeight: 40,
+    paddingHorizontal: Spacing.sixteen,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

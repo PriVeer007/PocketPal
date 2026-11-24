@@ -15,6 +15,7 @@ import {
 } from '@/components/app-ui';
 import { allowanceProgress, formatMoney, reconcileGoalBalances } from '@/finance.mjs';
 import { Goal, useFinance } from '@/store';
+import { Spacing } from '@/constants/theme';
 
 export default function GoalsScreen() {
   const p = usePalette();
@@ -53,6 +54,7 @@ export default function GoalsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Create a new savings goal"
             hitSlop={8}
+            style={ui.textAction}
           >
             <AppText variant="bodyMedium" weight="600" color={p.accent}>
               + New goal
@@ -63,7 +65,7 @@ export default function GoalsScreen() {
         {goals.length ? (
           <>
             {/* Overview Banner */}
-            <Surface style={{ padding: 20, backgroundColor: p.accentSoft, borderColor: p.accentSoft, gap: 6 }}>
+            <Surface style={{ padding: Spacing.twenty, backgroundColor: p.accentSoft, borderColor: p.accentSoft, gap: Spacing.eight }}>
               <AppText variant="eyebrow" color={p.accent}>
                 SAVINGS PROGRESS
               </AppText>
@@ -84,9 +86,9 @@ export default function GoalsScreen() {
               const isComplete = savedMinor >= goal.targetMinor;
 
               return (
-                <Surface key={goal.id} style={{ padding: 18, gap: 14 }}>
+                <Surface key={goal.id} style={{ gap: Spacing.twelve }}>
                   <View style={[ui.row, { justifyContent: 'space-between' }]}>
-                    <View style={{ flex: 1, gap: 2 }}>
+                    <View style={{ flex: 1, gap: Spacing.two }}>
                       <AppText variant="headline">{goal.name}</AppText>
                       <AppText variant="caption" color={p.textSecondary} tabular>
                         {formatMoney(savedMinor, preferences.currency)} of{' '}
@@ -104,8 +106,8 @@ export default function GoalsScreen() {
 
                   <ProgressBar value={progress} color={isComplete ? p.accent : p.accent} height={8} />
 
-                  <View style={[ui.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
-                    <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+                  <View style={[ui.row, { justifyContent: 'space-between', flexWrap: 'wrap', gap: Spacing.eight }]}>
+                    <View style={[ui.row, { gap: Spacing.eight, flexWrap: 'wrap', flex: 1 }]}>
                       {isComplete ? (
                         <AppText variant="captionMedium" color={p.accent}>
                           Target reached. Nicely done!
@@ -153,6 +155,7 @@ export default function GoalsScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Delete goal ${goal.name}`}
                       hitSlop={8}
+                      style={ui.textAction}
                     >
                       <AppText variant="caption" color={p.textSecondary}>
                         Delete

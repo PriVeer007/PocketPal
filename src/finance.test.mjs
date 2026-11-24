@@ -58,6 +58,159 @@ test('calculates allowance progress and remaining without exceeding bounds', () 
   assert.equal(allowanceProgress(10, 0), 0);
 });
 
+test('builds the cycle budget from base allowance and eligible in-cycle allowance income only', () => {
+  const cycleStartDate = new Date(2026, 10, 5);
+  const cycleThroughDate = new Date(2026, 10, 20);
+  const base = calculateBudgetSummary({ allowanceMinor: 10000 });
+  assert.equal(base.allowanceMinor, 10000);
+  assert.equal(base.incomeTopUpMinor, 0);
+  assert.equal(base.adjustedCycleBudgetMinor, 10000);
+  const ordinaryIncome = calculateBudgetSummary({
+    allowanceMinor: 10000,
+    incomes: [{ amountMinor: 5000, source: 'Scholarship', occurredAt: '2026-11-10T12:00:00.000Z' }],
+  });
+  assert.equal(ordinaryIncome.incomeTopUpMinor, 0);
+  assert.equal(ordinaryIncome.adjustedCycleBudgetMinor, 10000);
+
+  const incomes = [
+    { id: 1, amountMinor: 2000, source: 'Allowance', occurredAt: '2026-11-05T12:00:00.000Z' },
+    { id: 2, amountMinor: 1000, source: 'Allowance', occurredAt: '2026-11-20T12:00:00.000Z' },
+    { id: 3, amountMinor: 5000, source: 'Scholarship', occurredAt: '2026-11-10T12:00:00.000Z' },
+    { id: 4, amountMinor: 6000, source: 'Part-time work', occurredAt: '2026-11-12T12:00:00.000Z' },
+    { id: 5, amountMinor: 7000, source: 'Allowance', occurredAt: '2026-11-04T12:00:00.000Z' },
+    { id: 6, amountMinor: 8000, source: 'Allowance', occurredAt: '2026-11-21T12:00:00.000Z' },
+  ];
+  const summary = calculateBudgetSummary({
+    allowanceMinor: 10000,
+    incomes,
+    cycleStartDate,
+    cycleThroughDate,
+  });
+
+  assert.equal(summary.allowanceMinor, 10000);
+  assert.equal(summary.incomeTopUpMinor, 3000);
+  assert.equal(summary.adjustedCycleBudgetMinor, 13000);
+  assert.equal(summary.availableMinor, 13000);
+});
+
+test('matches the adjusted-cycle dashboard values for the ₹10,000 + ₹1,500 example', () => {
+  const summary = calculateBudgetSummary({
+    allowanceMinor: 1_000_000,
+    incomes: [
+      { id: 1, amountMinor: 150_000, source: 'Allowance', occurredAt: '2026-11-20T12:00:00.000Z' },
+    ],
+    cycleStartDate: new Date(2026, 10, 1),
+    cycleThroughDate: new Date(2026, 10, 24),
+    expenseMinor: 404_200,
+  });
+
+  assert.equal(summary.allowanceMinor, 1_000_000);
+  assert.equal(summary.incomeTopUpMinor, 150_000);
+  assert.equal(summary.adjustedCycleBudgetMinor, 1_150_000);
+  assert.equal(summary.availableMinor, 745_800);
+  assert.ok(Math.abs(allowanceProgress(summary.expenseMinor, summary.adjustedCycleBudgetMinor) - 0.3514782609) < 0.000000001);
+});
+
+test('counts distinct allowance top-ups once when income rows are duplicated', () => {
+  const summary = calculateBudgetSummary({
+    allowanceMinor: 1_000_000,
+    incomes: [
+      { id: 1, amountMinor: 50_000, source: 'Allowance', occurredAt: '2026-11-20T12:00:00.000Z' },
+      { id: 1, amountMinor: 50_000, source: 'Allowance', occurredAt: '2026-11-20T12:00:00.000Z' },
+      { id: 2, amountMinor: 100_000, source: 'Allowance', occurredAt: '2026-11-21T12:00:00.000Z' },
+    ],
+    cycleStartDate: new Date(2026, 10, 1),
+    cycleThroughDate: new Date(2026, 10, 24),
+    expenseMinor: 404_200,
+  });
+
+  assert.equal(summary.incomeTopUpMinor, 150_000);
+  assert.equal(summary.adjustedCycleBudgetMinor, 1_150_000);
+  assert.equal(summary.availableMinor, 745_800);
+});
+
+test('recalculates the cycle budget when an eligible income top-up is edited or deleted', () => {
+  const cycleStartDate = new Date(2026, 10, 1);
+  const cycleThroughDate = new Date(2026, 10, 30);
+  const topUp = { id: 1, amountMinor: 150_000, source: 'Allowance', occurredAt: '2026-11-10T12:00:00.000Z' };
+  const additionalTopUp = { id: 2, amountMinor: 50_000, source: 'Allowance', occurredAt: '2026-11-12T12:00:00.000Z' };
+  const summarize = (incomes) => calculateBudgetSummary({
+    allowanceMinor: 1_000_000,
+    incomes,
+    cycleStartDate,
+    cycleThroughDate,
+    expenseMinor: 404_200,
+  });
+
+  const oneTopUp = summarize([topUp]);
+  assert.equal(oneTopUp.adjustedCycleBudgetMinor, 1_150_000);
+  assert.equal(oneTopUp.availableMinor, 745_800);
+
+  const twoTopUps = summarize([topUp, additionalTopUp]);
+  assert.equal(twoTopUps.adjustedCycleBudgetMinor, 1_200_000);
+  assert.equal(twoTopUps.availableMinor, 795_800);
+
+  const afterDeletion = summarize([topUp]);
+  assert.equal(afterDeletion.adjustedCycleBudgetMinor, 1_150_000);
+  assert.equal(afterDeletion.availableMinor, 745_800);
+
+  const afterEdit = summarize([{ ...topUp, amountMinor: 200_000 }]);
+  assert.equal(afterEdit.adjustedCycleBudgetMinor, 1_200_000);
+  assert.equal(afterEdit.availableMinor, 795_800);
+
+  const noTopUps = summarize([]);
+  assert.equal(noTopUps.adjustedCycleBudgetMinor, 1_000_000);
+  assert.equal(noTopUps.availableMinor, 595_800);
+});
+
+test('deducts expenses and net savings once from the adjusted budget', () => {
+  const cycleStartDate = new Date(2026, 10, 1);
+  const cycleThroughDate = new Date(2026, 10, 30);
+  const incomes = [{ id: 1, amountMinor: 2000, source: 'Allowance', occurredAt: '2026-11-10T12:00:00.000Z' }];
+  const goals = [{ id: 1 }];
+  const deposit = { id: 1, goalId: 1, kind: 'deposit', amountMinor: 1000 };
+  const withdrawal = { id: 2, goalId: 1, kind: 'withdrawal', amountMinor: 1000 };
+  const summarize = (goalTransactions) => {
+    const balances = reconcileGoalBalances(goals, goalTransactions);
+    const savingsReservedMinor = Object.values(balances).reduce((total, amount) => total + amount, 0);
+    return calculateBudgetSummary({
+      allowanceMinor: 10000,
+      incomes,
+      cycleStartDate,
+      cycleThroughDate,
+      expenseMinor: 3000,
+      savingsReservedMinor,
+    });
+  };
+
+  const afterAllocation = summarize([deposit]);
+  assert.equal(afterAllocation.adjustedCycleBudgetMinor, 12000);
+  assert.equal(afterAllocation.availableMinor, 8000);
+  assert.equal(allowanceProgress(afterAllocation.expenseMinor, afterAllocation.adjustedCycleBudgetMinor), 0.25);
+
+  const afterWithdrawal = summarize([deposit, withdrawal]);
+  assert.equal(afterWithdrawal.availableMinor, 9000);
+  assert.equal(afterWithdrawal.savingsReservedMinor, 0);
+  assert.equal(afterWithdrawal.incomeTopUpMinor, 2000);
+});
+
+test('uses adjusted budget for zero-spend progress and caps visual progress at 100 percent', () => {
+  const cycleStartDate = new Date(2026, 10, 1);
+  const cycleThroughDate = new Date(2026, 10, 30);
+  const summary = calculateBudgetSummary({
+    allowanceMinor: 10000,
+    incomes: [{ id: 1, amountMinor: 2000, source: 'Allowance', occurredAt: '2026-11-10T12:00:00.000Z' }],
+    cycleStartDate,
+    cycleThroughDate,
+  });
+
+  assert.equal(summary.availableMinor, 12000);
+  assert.equal(allowanceProgress(0, summary.adjustedCycleBudgetMinor), 0);
+  assert.equal(allowanceProgress(3000, 13000), 3000 / 13000);
+  assert.equal(allowanceProgress(13000, summary.adjustedCycleBudgetMinor), 1);
+  assert.equal(allowanceProgress(15000, summary.adjustedCycleBudgetMinor), 1);
+});
+
 test('uses local dates for allowance cycle boundaries and avoids month rollover', () => {
   const date = new Date(2026, 10, 8, 16, 30);
   assert.equal(localDateKey(date), '2026-11-08');
@@ -443,15 +596,17 @@ test('calculates adaptive rollover vs fixed daily pacing', () => {
 
   const summary = calculateBudgetSummary({
     allowanceMinor: 900000,
-    incomeMinor: 200000,
+    incomes: [{ amountMinor: 200000, source: 'Allowance', occurredAt: '2026-11-10T12:00:00.000Z' }],
+    cycleStartDate: new Date(2026, 10, 1),
+    cycleThroughDate: new Date(2026, 10, 20),
     expenseMinor: 250000,
-    savingsReservedMinor: 100000,
-    withdrawalsMinor: 15000,
+    savingsReservedMinor: 85000,
     totalCycleDays: 30,
     daysLeft: 12,
     pacingMode: 'adaptive',
     zeroSpendDays: ['2026-11-09', '2026-11-10'],
   });
+  assert.equal(summary.adjustedCycleBudgetMinor, 1100000);
   assert.equal(summary.availableMinor, 765000);
   assert.equal(summary.remainingMinor, 765000);
   assert.equal(summary.zeroSpendDays, 2);
