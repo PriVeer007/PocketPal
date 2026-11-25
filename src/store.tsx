@@ -36,6 +36,8 @@ export type GoalTransaction = {
   amountMinor: number;
   occurredAt: string;
   note: string | null;
+  goalNameSnapshot?: string | null;
+  operationType?: 'Added Savings' | 'Withdrawal' | 'Deleted Goal Withdrawal' | null;
 };
 export type ZeroSpendDay = {
   dateKey: string;
@@ -264,6 +266,39 @@ export async function migrateDatabase(db: SQLiteDatabase) {
       `);
     });
   }
+
+  const v8Result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  if ((v8Result?.user_version ?? 0) < 8) {
+    await db.withTransactionAsync(async () => {
+      try {
+        await db.execAsync('ALTER TABLE goal_transactions ADD COLUMN goal_name_snapshot TEXT');
+      } catch {
+        // already present on newer databases
+      }
+      try {
+        await db.execAsync("ALTER TABLE goal_transactions ADD COLUMN operation_type TEXT CHECK(operation_type IN ('Added Savings','Withdrawal','Deleted Goal Withdrawal'))");
+      } catch {
+        // already present on newer databases
+      }
+      await db.execAsync(`
+        UPDATE goal_transactions
+        SET operation_type =
+          CASE
+            WHEN kind = 'deposit' THEN 'Added Savings'
+            WHEN note LIKE 'Withdrawn from deleted %' THEN 'Deleted Goal Withdrawal'
+            ELSE 'Withdrawal'
+          END
+        WHERE operation_type IS NULL;
+        UPDATE goal_transactions
+        SET goal_name_snapshot = (
+          SELECT name FROM goals WHERE goals.id = goal_transactions.goal_id
+        )
+        WHERE goal_name_snapshot IS NULL;
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (8, datetime('now'));
+        PRAGMA user_version = 8;
+      `);
+    });
+  }
 }
 
 export type ExpenseInput = Omit<Expense, 'id'>;
@@ -367,7 +402,9 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
           amount_minor: number;
           occurred_at: string;
           note: string | null;
-        }>('SELECT id, goal_id, kind, amount_minor, occurred_at, note FROM goal_transactions ORDER BY occurred_at DESC, id DESC'),
+          goal_name_snapshot: string | null;
+          operation_type: 'Added Savings' | 'Withdrawal' | 'Deleted Goal Withdrawal' | null;
+        }>('SELECT id, goal_id, kind, amount_minor, occurred_at, note, goal_name_snapshot, operation_type FROM goal_transactions ORDER BY occurred_at DESC, id DESC'),
         db.getAllAsync<{ category: string; amount_minor: number }>('SELECT category, amount_minor FROM category_budgets'),
         db.getAllAsync<{ date_key: string; created_at: string }>('SELECT date_key, created_at FROM zero_spend_days ORDER BY date_key DESC'),
       ]);
@@ -411,6 +448,8 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         amountMinor: r.amount_minor,
         occurredAt: r.occurred_at,
         note: r.note,
+        goalNameSnapshot: r.goal_name_snapshot,
+        operationType: r.operation_type,
       }));
       const loadedGoals = goalRows.map((r) => ({
           id: r.id,
@@ -599,26 +638,30 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         const occurredAt = new Date().toISOString();
         let nextSaved = 0;
         let transactionId = 0;
+        let transactionGoalName: string | null = null;
         await db.withTransactionAsync(async () => {
-          const row = await db.getFirstAsync<{ id: number; target_minor: number; deleted_at: string | null }>(
-            'SELECT id, target_minor, deleted_at FROM goals WHERE id = ?',
+          const row = await db.getFirstAsync<{ id: number; name: string; target_minor: number; deleted_at: string | null }>(
+            'SELECT id, name, target_minor, deleted_at FROM goals WHERE id = ?',
             id
           );
           if (!row || row.deleted_at !== null) {
             throw new Error('This goal no longer exists.');
           }
+          transactionGoalName = row.name;
 
           const savedMinor = await getGoalLedgerBalance(db, id);
           nextSaved = applyGoalBalanceChange(savedMinor, 'deposit', amountMinor, row.target_minor);
           await db.runAsync('UPDATE goals SET saved_minor = ? WHERE id=?', nextSaved, id);
           const result = await db.runAsync(
-            'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at, goal_name_snapshot, operation_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             id,
             'deposit',
             amountMinor,
             occurredAt,
             null,
-            occurredAt
+            occurredAt,
+            row.name ?? null,
+            'Added Savings'
           );
           transactionId = Number(result.lastInsertRowId ?? 0);
         });
@@ -627,7 +670,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         setGoalRecords((current) => current.map((goal) => goal.id === id ? { ...goal, savedMinor: nextSaved } : goal));
         if (transactionId > 0) {
           setGoalTransactions((current) => [
-            { id: transactionId, goalId: id, kind: 'deposit', amountMinor, occurredAt, note: null },
+            { id: transactionId, goalId: id, kind: 'deposit', amountMinor, occurredAt, note: null, goalNameSnapshot: transactionGoalName, operationType: 'Added Savings' },
             ...current,
           ]);
         }
@@ -648,26 +691,30 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         const occurredAt = new Date().toISOString();
         let nextSaved = 0;
         let transactionId = 0;
+        let transactionGoalName: string | null = null;
         await db.withTransactionAsync(async () => {
-          const row = await db.getFirstAsync<{ id: number; deleted_at: string | null }>(
-            'SELECT id, deleted_at FROM goals WHERE id = ?',
+          const row = await db.getFirstAsync<{ id: number; name: string; deleted_at: string | null }>(
+            'SELECT id, name, deleted_at FROM goals WHERE id = ?',
             id
           );
           if (!row || row.deleted_at !== null) {
             throw new Error('This goal no longer exists.');
           }
+          transactionGoalName = row.name;
 
           const savedMinor = await getGoalLedgerBalance(db, id);
           nextSaved = applyGoalBalanceChange(savedMinor, 'withdrawal', amountMinor);
           await db.runAsync('UPDATE goals SET saved_minor = ? WHERE id=?', nextSaved, id);
           const result = await db.runAsync(
-            'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at, goal_name_snapshot, operation_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             id,
             'withdrawal',
             amountMinor,
             occurredAt,
             null,
-            occurredAt
+            occurredAt,
+            row.name ?? null,
+            'Withdrawal'
           );
           transactionId = Number(result.lastInsertRowId ?? 0);
         });
@@ -676,7 +723,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         setGoalRecords((current) => current.map((goal) => goal.id === id ? { ...goal, savedMinor: nextSaved } : goal));
         if (transactionId > 0) {
           setGoalTransactions((current) => [
-            { id: transactionId, goalId: id, kind: 'withdrawal', amountMinor, occurredAt, note: null },
+            { id: transactionId, goalId: id, kind: 'withdrawal', amountMinor, occurredAt, note: null, goalNameSnapshot: transactionGoalName, operationType: 'Withdrawal' },
             ...current,
           ]);
         }
@@ -712,13 +759,15 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
           const savedMinor = await getGoalLedgerBalance(db, id);
           if (savedMinor > 0) {
             const result = await db.runAsync(
-              'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+              'INSERT INTO goal_transactions (goal_id, kind, amount_minor, occurred_at, note, created_at, goal_name_snapshot, operation_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
               id,
               'withdrawal',
               savedMinor,
               deletedAt,
-              `Goal closed: ${row.name}`,
-              deletedAt
+              `Withdrawn from deleted ${row.name}`,
+              deletedAt,
+              row.name,
+              'Deleted Goal Withdrawal'
             );
             closureTransaction = {
               id: Number(result.lastInsertRowId ?? 0),
@@ -726,7 +775,9 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
               kind: 'withdrawal',
               amountMinor: savedMinor,
               occurredAt: deletedAt,
-              note: `Goal closed: ${row.name}`,
+              note: `Withdrawn from deleted ${row.name}`,
+              goalNameSnapshot: row.name,
+              operationType: 'Deleted Goal Withdrawal',
             };
           }
 
@@ -897,14 +948,16 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
             for (const tx of source.goalTransactions) {
               if (!tx || !tx.goalId) continue;
               await db.runAsync(
-                'INSERT INTO goal_transactions (id, goal_id, kind, amount_minor, occurred_at, note, created_at) VALUES (?,?,?,?,?,?,?)',
+                'INSERT INTO goal_transactions (id, goal_id, kind, amount_minor, occurred_at, note, created_at, goal_name_snapshot, operation_type) VALUES (?,?,?,?,?,?,?,?,?)',
                 tx.id,
                 tx.goalId,
                 tx.kind === 'withdrawal' ? 'withdrawal' : 'deposit',
                 tx.amountMinor,
                 tx.occurredAt || new Date().toISOString(),
                 tx.note || null,
-                tx.occurredAt || new Date().toISOString()
+                tx.occurredAt || new Date().toISOString(),
+                tx.goalNameSnapshot || null,
+                tx.operationType || (tx.kind === 'withdrawal' ? 'Withdrawal' : 'Added Savings')
               );
             }
           } else if (Array.isArray(source.goals)) {

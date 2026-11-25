@@ -20,11 +20,11 @@ export default function EditGoalScreen() {
 
   if (!goal) {
     return (
-      <Screen title="Goal not found" hasBottomNav={false}>
+      <Screen title="Goal Not Found" hasBottomNav={false}>
         <AppText variant="body" color={p.textSecondary}>
           This savings goal may have been removed.
         </AppText>
-        <ActionButton label="Back to goals" onPress={() => router.back()} />
+        <ActionButton label="Back To Goals" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -59,12 +59,12 @@ export default function EditGoalScreen() {
   return (
     <Screen
       hasBottomNav={false}
-      title="Edit goal"
+      title="Edit Goal"
       action={
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Cancel goal edit"
+          accessibilityLabel="Cancel Goal Edit"
           hitSlop={8}
           style={ui.textAction}
         >
@@ -75,7 +75,7 @@ export default function EditGoalScreen() {
       }
     >
       <View style={{ gap: 8 }}>
-        <AppText variant="captionMedium">What are you saving for?</AppText>
+        <AppText variant="captionMedium">What Are You Saving For?</AppText>
         <TextInput
           value={name}
           onChangeText={(v) => {
@@ -97,7 +97,7 @@ export default function EditGoalScreen() {
       </View>
 
       <Surface style={{ gap: 12 }}>
-        <AppText variant="captionMedium">Updated target amount ({preferences.currency})</AppText>
+        <AppText variant="captionMedium">Updated Target Amount ({preferences.currency})</AppText>
         <TextInput
           value={amount}
           onChangeText={(value) => {
@@ -108,10 +108,10 @@ export default function EditGoalScreen() {
           placeholder="0"
           placeholderTextColor={p.textSecondary}
           style={[styles.amountInput, { color: p.text, borderBottomColor: p.border }]}
-          accessibilityLabel="Updated target savings amount"
+          accessibilityLabel="Updated Target Savings Amount"
         />
         <AppText variant="caption" color={p.textSecondary} tabular>
-          Current progress: {formatMoney(savedMinor, preferences.currency)} already saved
+          Current Progress: {formatMoney(savedMinor, preferences.currency)} already saved
         </AppText>
       </Surface>
 

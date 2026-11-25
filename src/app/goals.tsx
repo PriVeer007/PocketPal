@@ -28,10 +28,10 @@ export default function GoalsScreen() {
 
   const confirmDelete = (goal: Goal) => {
     Alert.alert(
-      'Remove this goal?',
+      'Remove This Goal?',
       `“${goal.name}” will be closed. Any remaining savings will be returned to your available budget, and its history will be kept.`,
       [
-        { text: 'Keep goal', style: 'cancel' },
+        { text: 'Keep Goal', style: 'cancel' },
         {
           text: 'Remove',
           style: 'destructive',
@@ -46,18 +46,18 @@ export default function GoalsScreen() {
   return (
     <AppScaffold>
       <Screen
-        eyebrow="For something that matters to you"
-        title="Savings goals"
+        eyebrow="For Something That Matters To You"
+        title="Savings Goals"
         action={
           <Pressable
             onPress={() => router.push('/goal-create')}
             accessibilityRole="button"
-            accessibilityLabel="Create a new savings goal"
+            accessibilityLabel="Create A New Savings Goal"
             hitSlop={8}
             style={ui.textAction}
           >
             <AppText variant="bodyMedium" weight="600" color={p.accent}>
-              + New goal
+              + New Goal
             </AppText>
           </Pressable>
         }
@@ -78,7 +78,7 @@ export default function GoalsScreen() {
               </AppText>
             </Surface>
 
-            <SectionTitle title="Your targets" detail="Small, steady contributions add up" />
+            <SectionTitle title="Your Targets" detail="Small, steady contributions add up" />
 
             {goals.map((goal) => {
               const savedMinor = goalBalances[goal.id] ?? goal.savedMinor;
@@ -114,7 +114,7 @@ export default function GoalsScreen() {
                         </AppText>
                       ) : (
                         <ActionButton
-                          label="Add savings"
+                          label="Add Savings"
                           variant="quiet"
                           onPress={() =>
                             router.push({
@@ -138,7 +138,7 @@ export default function GoalsScreen() {
 
                       {savedMinor > 0 ? (
                         <ActionButton
-                          label="Withdraw"
+                          label="Withdraw Savings"
                           variant="quiet"
                           onPress={() =>
                             router.push({
@@ -168,9 +168,9 @@ export default function GoalsScreen() {
           </>
         ) : (
           <EmptyState
-            title="Give a future plan a name"
+            title="Give A Future Plan A Name"
             detail="A trip home, a laptop, a buffer for exam season. Saving can be small, steady, and entirely at your own pace."
-            cta="Create your first goal"
+            cta="Create Your First Goal"
             onPress={() => router.push('/goal-create')}
           />
         )}

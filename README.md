@@ -1,41 +1,96 @@
 # PocketPal
 
-PocketPal is a behavioural approach to student budget management. It keeps everyday expenses, category limits, and savings goals on the device and works without an account or bank connection.
+**A private, student-focused money tracker for everyday spending and savings.**
 
-## Start the app
+PocketPal helps students make their allowance and personal spending easier to understand. Record expenses and income, set an allowance cycle, reflect on spending choices, review trends, and track savings goals—all in one offline-first mobile app.
+
+## The problem
+
+Students often need to manage limited or irregular funds while balancing food, transport, study costs, social plans, and savings. Without a simple record of everyday transactions, it is easy to lose track of spending, overlook recurring habits, or postpone savings.
+
+## The approach
+
+PocketPal brings day-to-day financial records, allowance awareness, optional spending reflections, and savings goals together. Its summaries and visual reports help users notice patterns and make their own decisions; they are not financial advice.
+
+## Features
+
+- **Allowance and daily planning:** Set a monthly allowance cycle and choose fixed or adaptive daily pacing.
+- **Expense and income tracking:** Record, edit, and review expenses; log income by source, with eligible allowance top-ups reflected in the current cycle.
+- **Optional spending reflections:** Mark an expense as planned, spontaneous, needed, or just wanted.
+- **Dashboard and activity:** See current-cycle availability, recent activity, and searchable, filterable transaction history.
+- **Insights:** Explore daily, weekly, and monthly spending trends, category breakdowns, calendar activity, reflection summaries, and evidence-based spending personas when enough data is available.
+- **Savings goals:** Create targets, add contributions, make withdrawals, and retain a history when a goal is closed.
+- **Personalisation:** Configure profile details, currency, cycle start day, pacing, and system/light/dark appearance.
+- **On-device data tools:** Keep records in local SQLite storage, export expense CSV, and create or restore a JSON backup.
+
+## App screens
+
+| Screen | What it is for |
+| --- | --- |
+| **Today** | Current-cycle availability, daily pacing, recent activity, and a spending trend. |
+| **Activity** | Search and filter expenses, income, and savings history; edit or remove expenses. |
+| **Insights** | Review behavioural reflections, category spending, calendar activity, and time-based trends. |
+| **Goals** | Track savings targets, contributions, withdrawals, and progress. |
+| **You** | Manage your profile, allowance, category limits, pacing, appearance, and data export/restore. |
+
+## Technology
+
+- **Expo SDK 58** and **React Native** — cross-platform mobile application framework.
+- **TypeScript** — typed application code.
+- **Expo Router** — file-based screens and navigation.
+- **Expo SQLite** — local persistence.
+- **React Native SVG** — category donut visualisation.
+- **React Native Reanimated** — lightweight progress and interaction motion.
+- **Node.js test runner** — finance utility tests.
+
+## Getting started
+
+Requirements: Node.js and npm. Android development additionally requires the Android SDK and an emulator or connected device.
 
 ```sh
 npm install
-npx expo start
+npm start
 ```
 
-Use `a` in the Expo terminal to open the Android emulator, or scan the development QR code with Expo Go. A development build is needed for native packages that Expo Go does not include; the app currently uses Expo SQLite, which is included in Expo Go for SDK 58.
+From the Expo CLI, press `a` to open an available Android emulator, or start the web target with:
 
-## Product areas
+```sh
+npm run web
+```
 
-- First-run setup for student name, currency, allowance amount, and cycle start day.
-- Dashboard with cycle remainder, spending pace, optional category budgets, and recent entries.
-- One-step expense entry with optional behavioural reflection and a note.
-- Searchable, filterable activity with confirmed deletion.
-- Current-cycle category insights and non-judgemental reflection summaries.
-- Savings goals with locally recorded contributions.
-- Profile, allowance, category budget, and adaptive light/dark settings.
+For a locally compiled Android development app, configure the Android SDK and run:
 
-See [PRODUCT-DESIGN.md](./PRODUCT-DESIGN.md) for the screen-by-screen specification and interaction rules.
+```sh
+npm run android
+```
 
-## Local data and money
+Use the Expo Go app only where its included native modules meet the project’s needs; otherwise build and install a development client.
 
-The app stores its SQLite database in the device's application data directory as `pocketpal.db`. Versioned schema migrations create tables for preferences, expenses, goals, and category budgets. All user values go through parameterized SQL statements. Records stay on the device; this MVP does not sync or back up data.
+## Project layout
 
-Money uses integer currency minor units and the selected currency's fraction digits. Expense timestamps are stored as ISO instants and grouped using the device's local calendar. The allowance cycle supports start days 1 through 28 to avoid short-month edge cases.
+```text
+src/
+  app/          Expo Router screens
+  components/   Shared UI, charts, and motion components
+  constants/    Theme and design tokens
+  store.tsx     Local database and app state
+  finance.mjs   Reusable financial and analytics utilities
+android/        Native Android Gradle project
+assets/         App icons and visual assets
+```
 
 ## Checks
 
 ```sh
-npm run typecheck
 npm test
+npm run typecheck
 npm run lint
-npx expo export --platform android --output-dir .expo/export-android
 ```
 
-The calculation tests use Node's built-in test runner and cover currency minor units and formatting, date and cycle boundaries, allowance totals and progress, daily spend trends, category breakdowns, and expense validation.
+## Future scope
+
+Cloud synchronisation, bank connections, cross-device accounts, and shared household/student budgets are not currently implemented. These are possible future directions, not current features.
+
+## Privacy
+
+PocketPal is designed for local use and does not require an account or bank connection. Exported backups and shared CSV data are controlled by the user; keep backup files in a secure location.

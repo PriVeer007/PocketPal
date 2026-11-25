@@ -55,7 +55,7 @@ export default function RestoreBackupScreen() {
     }
 
     Alert.alert(
-      'Replace local data?',
+      'Replace Local Data?',
       `This will replace your existing local PocketPal data with the imported backup.\n\n` +
         `Created: ${preview.exportedAt ?? 'Unknown'}\n` +
         `Schema: ${preview.version}\n` +
@@ -69,14 +69,14 @@ export default function RestoreBackupScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Replace data',
+          text: 'Replace Data',
           style: 'destructive',
           onPress: async () => {
             setRestoring(true);
             setError('');
             try {
               await restoreBackup(jsonText);
-              Alert.alert('Restore complete', 'Your backup was validated and applied successfully.');
+              Alert.alert('Restore Complete', 'Your backup was validated and applied successfully.');
               router.back();
             } catch (err) {
               setError(err instanceof Error ? err.message : 'The backup could not be restored.');
@@ -92,12 +92,12 @@ export default function RestoreBackupScreen() {
   return (
     <Screen
       hasBottomNav={false}
-      title="Restore backup"
+      title="Restore Backup"
       action={
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Cancel restore"
+          accessibilityLabel="Cancel Restore"
           hitSlop={8}
           style={ui.textAction}
         >
@@ -125,11 +125,11 @@ export default function RestoreBackupScreen() {
           placeholder='{"app": "PocketPal", ...}'
           placeholderTextColor={p.textSecondary}
           style={[ui.input, styles.input, { color: p.text, backgroundColor: p.backgroundElement, borderColor: p.border }]}
-          accessibilityLabel="PocketPal backup JSON"
+          accessibilityLabel="PocketPal Backup JSON"
         />
 
         <ActionButton
-          label="Validate backup"
+          label="Validate Backup"
           variant="quiet"
           onPress={validateAndPreview}
         />
@@ -137,16 +137,16 @@ export default function RestoreBackupScreen() {
 
       {preview ? (
         <Surface style={{ gap: 8 }}>
-          <AppText variant="headline">Backup preview</AppText>
+          <AppText variant="headline">Backup Preview</AppText>
           <AppText variant="caption" color={p.textSecondary}>Created: {preview.exportedAt ?? 'Unknown'}</AppText>
-          <AppText variant="caption" color={p.textSecondary}>Schema version: {preview.version}</AppText>
+          <AppText variant="caption" color={p.textSecondary}>Schema Version: {preview.version}</AppText>
           <AppText variant="caption" color={p.textSecondary}>Expenses: {preview.expenseCount}</AppText>
           <AppText variant="caption" color={p.textSecondary}>Incomes: {preview.incomeCount}</AppText>
           <AppText variant="caption" color={p.textSecondary}>Goals: {preview.goalCount}</AppText>
-          <AppText variant="caption" color={p.textSecondary}>Savings ledger entries: {preview.goalTransactionCount}</AppText>
-          <AppText variant="caption" color={p.textSecondary}>Budget entries: {preview.budgetCount}</AppText>
-          <AppText variant="caption" color={p.textSecondary}>Zero-spend days: {preview.zeroSpendCount}</AppText>
-          <AppText variant="caption" color={p.textSecondary}>Current snapshot kept in memory: {currentSnapshot.length} chars</AppText>
+          <AppText variant="caption" color={p.textSecondary}>Savings Ledger Entries: {preview.goalTransactionCount}</AppText>
+          <AppText variant="caption" color={p.textSecondary}>Budget Entries: {preview.budgetCount}</AppText>
+          <AppText variant="caption" color={p.textSecondary}>Zero-Spend Days: {preview.zeroSpendCount}</AppText>
+          <AppText variant="caption" color={p.textSecondary}>Current Snapshot Kept In Memory: {currentSnapshot.length} chars</AppText>
         </Surface>
       ) : null}
 
@@ -157,7 +157,7 @@ export default function RestoreBackupScreen() {
       ) : null}
 
       <ActionButton
-        label={restoring ? 'Restoring…' : 'Restore now'}
+        label={restoring ? 'Restoring…' : 'Restore Now'}
         onPress={confirmRestore}
         disabled={!preview || restoring}
       />

@@ -17,6 +17,7 @@ import {
   generateBackupJSON,
   generateExpensesCSV,
   goalLedgerSummary,
+  goalLedgerSummaryForPeriod,
   localDateKey,
   monthCalendarData,
   monthlySpendTrend,
@@ -293,6 +294,33 @@ test('generates calendar heatmap data and identifies zero spend days', () => {
   assert.equal(cal.activeSpendDays, 2);
   assert.equal(cal.zeroSpendDays, 8); // 10 days elapsed - 2 spend days = 8 zero spend days
   assert.equal(cal.totalSpentMinor, 550);
+});
+
+test('summarizes savings activity by period and preserves exact operation classifications', () => {
+  const transactions = [
+    { id: 1, kind: 'deposit', amountMinor: 25000, occurredAt: '2026-11-03T10:00:00.000Z', operationType: 'Added Savings', goalNameSnapshot: 'Books' },
+    { id: 2, kind: 'withdrawal', amountMinor: 5000, occurredAt: '2026-11-10T10:00:00.000Z', operationType: 'Withdrawal', goalNameSnapshot: 'Books' },
+    { id: 3, kind: 'withdrawal', amountMinor: 7000, occurredAt: '2026-11-12T10:00:00.000Z', operationType: 'Deleted Goal Withdrawal', goalNameSnapshot: 'Laptop', note: 'Withdrawn from deleted Laptop' },
+    { id: 4, kind: 'deposit', amountMinor: 9000, occurredAt: '2026-10-12T10:00:00.000Z', operationType: 'Added Savings', goalNameSnapshot: 'Old goal' },
+  ];
+  const summary = goalLedgerSummaryForPeriod(
+    transactions,
+    new Date(2026, 10, 1),
+    new Date(2026, 10, 30)
+  );
+
+  assert.equal(summary.additionsMinor, 25000);
+  assert.equal(summary.withdrawalsMinor, 12000);
+  assert.equal(summary.netMinor, 13000);
+  assert.equal(summary.transactionCount, 3);
+
+  const records = buildActivityRecords({
+    goals: [{ id: 2, name: 'Laptop' }],
+    goalTransactions: transactions.map((tx) => ({ ...tx, goalId: 2 })),
+  });
+  assert.equal(records.find((record) => record.type === 'goalClosure')?.title, 'Withdrawn from deleted Laptop');
+  assert.equal(records.find((record) => record.type === 'savingsAllocation')?.title, 'Added Savings — Books');
+  assert.equal(records.find((record) => record.type === 'savingsWithdrawal')?.title, 'Withdrawal — Books');
 });
 
 test('summarizes savings ledger activity and includes it in backups', () => {

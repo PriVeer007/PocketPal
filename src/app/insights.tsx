@@ -23,8 +23,10 @@ import {
   cycleStart,
   dailySpendTrend,
   formatMoney,
+  goalLedgerSummaryForPeriod,
   localDateKey,
   monthlySpendTrend,
+  reconcileGoalBalances,
   sumExpenses,
   weeklySpendTrend,
 } from '@/finance.mjs';
@@ -34,15 +36,17 @@ import { Spacing } from '@/constants/theme';
 type InsightTab = 'overview' | 'behaviour' | 'trends';
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type RangeOption = 'cycle' | '7d' | '30d';
+type DistributionView = 'spending' | 'savings';
 
 export default function InsightsScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
-  const { ready, error, preferences, expenses, goalTransactions } = useFinance();
+  const { ready, error, preferences, expenses, goals, goalTransactions } = useFinance();
 
   const [activeTab, setActiveTab] = useState<InsightTab>('overview');
   const [range, setRange] = useState<RangeOption>('cycle');
   const [granularity, setGranularity] = useState<Granularity>('daily');
+  const [distributionView, setDistributionView] = useState<DistributionView>('spending');
 
   const now = useMemo(() => new Date(), []);
 
@@ -51,16 +55,16 @@ export default function InsightsScreen() {
       const start = new Date(now);
       start.setDate(start.getDate() - 6);
       start.setHours(0, 0, 0, 0);
-      return { from: start, to: now, label: 'Past 7 days' };
+      return { from: start, to: now, label: 'Past 7 Days' };
     }
     if (range === '30d') {
       const start = new Date(now);
       start.setDate(start.getDate() - 29);
       start.setHours(0, 0, 0, 0);
-      return { from: start, to: now, label: 'Past 30 days' };
+      return { from: start, to: now, label: 'Past 30 Days' };
     }
     const cycle = cycleStart(now, preferences.cycleStartDay);
-    return { from: cycle, to: now, label: 'Current cycle' };
+    return { from: cycle, to: now, label: 'Current Cycle' };
   }, [now, preferences.cycleStartDay, range]);
 
   const totalSpent = useMemo(() => sumExpenses(expenses, from, to), [expenses, from, to]);
@@ -81,6 +85,18 @@ export default function InsightsScreen() {
   }, [expenses, from, to, granularity]);
 
   const breakdown = useMemo(() => categoryBreakdown(expenses, from, to), [expenses, from, to]);
+  const savingsPeriod = useMemo(
+    () => goalLedgerSummaryForPeriod(goalTransactions, from, to),
+    [goalTransactions, from, to]
+  );
+  const goalBalances = useMemo(
+    () => reconcileGoalBalances(goals, goalTransactions),
+    [goals, goalTransactions]
+  );
+  const reservedSavings = useMemo(
+    () => goals.reduce((total, goal) => total + Math.max(0, goalBalances[goal.id] ?? goal.savedMinor ?? 0), 0),
+    [goals, goalBalances]
+  );
 
   const inWindowExpenses = useMemo(() => {
     const startKey = localDateKey(from);
@@ -138,7 +154,7 @@ export default function InsightsScreen() {
 
   return (
     <AppScaffold showFloatingAdd={false}>
-      <Screen eyebrow="Patterns & habits" title="Insights">
+      <Screen eyebrow="Patterns & Habits" title="Insights">
         {/* Main Section Navigation: Overview | Behaviour | Trends */}
         <View style={styles.topTabsContainer}>
           {(
@@ -242,21 +258,21 @@ export default function InsightsScreen() {
                   </AppText>
                   {!spendingProfile || spendingProfile.status === 'error' ? (
                     <>
-                      <AppText variant="headline" weight="700">Profile unavailable</AppText>
+                      <AppText variant="headline" weight="700">Profile Unavailable</AppText>
                       <AppText variant="caption" color={p.textSecondary}>
                         Saved data could not be calculated. Please try again.
                       </AppText>
                     </>
                   ) : spendingProfile.status === 'no-data' ? (
                     <>
-                      <AppText variant="headline" weight="700">Your spending story starts here.</AppText>
+                      <AppText variant="headline" weight="700">Your Spending Story Starts Here.</AppText>
                       <AppText variant="caption" color={p.textSecondary}>
                         Add a few expenses to discover your spending habits and personalised insights.
                       </AppText>
                     </>
                   ) : spendingProfile.status === 'insufficient-data' ? (
                     <>
-                      <AppText variant="headline" weight="700">Building your spending profile.</AppText>
+                      <AppText variant="headline" weight="700">Building Your Spending Profile.</AppText>
                       <AppText variant="caption" color={p.textSecondary}>
                         {spendingProfile.eligibleTransactionCount} eligible expenses across {spendingProfile.distinctDayCount} days. Keep recording expenses across at least 3 distinct days.
                       </AppText>
@@ -287,6 +303,56 @@ export default function InsightsScreen() {
               </View>
             </Surface>
 
+            <Surface style={{ gap: Spacing.twelve }}>
+              <SectionTitle title="Savings" detail={label} />
+              {savingsPeriod.transactionCount > 0 ? (
+                <>
+                  <View style={[ui.row, { justifyContent: 'space-between', gap: Spacing.twelve }]}>
+                    <View style={{ flex: 1, gap: Spacing.two }}>
+                      <AppText variant="caption" color={p.textSecondary}>Added Savings</AppText>
+                      <AppText variant="headline" weight="700" tabular>
+                        {formatMoney(savingsPeriod.additionsMinor, preferences.currency)}
+                      </AppText>
+                    </View>
+                    <View style={{ flex: 1, gap: Spacing.two }}>
+                      <AppText variant="caption" color={p.textSecondary}>Withdrawals</AppText>
+                      <AppText variant="headline" weight="700" tabular>
+                        {formatMoney(savingsPeriod.withdrawalsMinor, preferences.currency)}
+                      </AppText>
+                    </View>
+                  </View>
+                  <View style={[ui.row, { justifyContent: 'space-between', gap: Spacing.twelve }]}>
+                    <AppText variant="bodyMedium" weight="600">Net Allocated</AppText>
+                    <AppText variant="bodyMedium" weight="700" color={p.accent} tabular>
+                      {formatMoney(savingsPeriod.netMinor, preferences.currency)}
+                    </AppText>
+                  </View>
+                </>
+              ) : (
+                <AppText variant="body" color={p.textSecondary}>
+                  No savings activity in this period.
+                </AppText>
+              )}
+              <View style={[ui.row, { justifyContent: 'space-between', gap: Spacing.twelve }]}>
+                <AppText variant="captionMedium" color={p.textSecondary}>Reserved Across Active Goals</AppText>
+                <AppText variant="bodyMedium" weight="700" tabular>
+                  {formatMoney(reservedSavings, preferences.currency)}
+                </AppText>
+              </View>
+              {goals.length > 0 ? (
+                <View style={{ gap: Spacing.eight }}>
+                  {goals.map((goal) => (
+                    <View key={goal.id} style={[ui.row, { justifyContent: 'space-between', gap: Spacing.twelve }]}>
+                      <AppText variant="captionMedium" color={p.textSecondary}>{goal.name}</AppText>
+                      <AppText variant="captionMedium" weight="600" tabular>
+                        {formatMoney(goalBalances[goal.id] ?? goal.savedMinor, preferences.currency)}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </Surface>
+
             {/* Card 2: Top Categories with Donut-style Circular Graphic */}
             <Surface style={{ gap: Spacing.sixteen }}>
               <View style={[ui.row, { justifyContent: 'space-between' }]}>
@@ -303,7 +369,32 @@ export default function InsightsScreen() {
                 </AppText>
               </View>
 
-              {breakdown.length > 0 ? (
+              <View style={[ui.row, { gap: Spacing.eight }]}>
+                {([
+                  { id: 'spending' as const, label: 'Spending By Category' },
+                  { id: 'savings' as const, label: 'Financial Distribution' },
+                ] as const).map((option) => {
+                  const active = distributionView === option.id;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      onPress={() => setDistributionView(option.id)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        ui.chip,
+                        { backgroundColor: active ? p.accent : p.backgroundSelected },
+                      ]}
+                    >
+                      <AppText variant="captionMedium" color={active ? onAccent : p.text}>
+                        {option.label}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {distributionView === 'spending' && breakdown.length > 0 ? (
                 <View style={[ui.row, { gap: Spacing.sixteen, alignItems: 'center' }]}>
                   {/* Circular Total Indicator (Donut style) */}
                   <CategoryDonut segments={breakdown} size={110}>
@@ -339,6 +430,52 @@ export default function InsightsScreen() {
                     ))}
                   </View>
                 </View>
+              ) : distributionView === 'savings' ? (
+                (() => {
+                  const netSavingsMinor = Math.max(0, savingsPeriod.netMinor);
+                  const distributionTotalMinor = totalSpent + netSavingsMinor;
+                  const segments =
+                    distributionTotalMinor > 0
+                      ? [
+                          {
+                            category: 'Actual Expenditure',
+                            percentage: (totalSpent / distributionTotalMinor) * 100,
+                          },
+                          ...(netSavingsMinor > 0
+                            ? [{
+                                category: 'Savings Allocation',
+                                percentage: (netSavingsMinor / distributionTotalMinor) * 100,
+                              }]
+                            : []),
+                        ]
+                      : [];
+                  return segments.length > 0 ? (
+                    <View style={[ui.row, { gap: Spacing.sixteen, alignItems: 'center' }]}>
+                      <CategoryDonut segments={segments} size={110}>
+                        <AppText variant="captionMedium" weight="700" tabular size={13}>
+                          {formatMoney(distributionTotalMinor, preferences.currency)}
+                        </AppText>
+                        <AppText variant="caption" color={p.textSecondary} size={11}>
+                          Distribution
+                        </AppText>
+                      </CategoryDonut>
+                      <View style={{ flex: 1, gap: Spacing.eight }}>
+                        {segments.map((segment) => (
+                          <View key={segment.category} style={[ui.row, { justifyContent: 'space-between', gap: Spacing.eight }]}>
+                            <AppText variant="captionMedium" weight="600">{segment.category}</AppText>
+                            <AppText variant="captionMedium" color={p.textSecondary} tabular>
+                              {Math.round(segment.percentage)}%
+                            </AppText>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : (
+                    <AppText variant="body" color={p.textSecondary}>
+                      No expenditure or net savings allocation in this period.
+                    </AppText>
+                  );
+                })()
               ) : (
                 <AppText variant="body" color={p.textSecondary}>
                   No category spending logged in this window.
@@ -374,7 +511,7 @@ export default function InsightsScreen() {
 
             {/* Detailed Category Breakdown */}
             <View style={{ gap: Spacing.twelve }}>
-              <SectionTitle title="Full breakdown" detail="All categories in this period" />
+              <SectionTitle title="Full Breakdown" detail="All categories in this period" />
               <CategoryBreakdownList breakdown={breakdown} currency={preferences.currency} />
             </View>
           </>
@@ -384,20 +521,24 @@ export default function InsightsScreen() {
         {activeTab === 'behaviour' ? (
           <>
             <Surface style={{ gap: Spacing.twelve }}>
-              <AppText variant="headline">Mindful vs. Impulse Spending</AppText>
+              <AppText variant="headline">Mindful Vs. Impulse Spending</AppText>
               <AppText variant="body" color={p.textSecondary}>
                 PocketPal encourages noticing how purchases feel without guilt.
               </AppText>
               {spendingProfile?.status === 'ready' && spendingProfile.mindfulPercentage !== null ? (
                 <>
                   <ProgressBar value={spendingProfile.mindfulPercentage / 100} height={10} color={p.accent} />
-                  <View style={[ui.row, { justifyContent: 'space-between' }]}>
-                    <AppText variant="captionMedium" color={p.accent}>
-                      Mindful: {spendingProfile.mindfulPercentage}% of reflected expenses
-                    </AppText>
-                    <AppText variant="captionMedium" color={p.textSecondary}>
-                      Impulse: {100 - spendingProfile.mindfulPercentage}% of reflected expenses
-                    </AppText>
+                  <View style={{ width: '100%', gap: Spacing.four }}>
+                    <View style={{ width: '100%', flexShrink: 1 }}>
+                      <AppText variant="captionMedium" color={p.accent} style={{ flexShrink: 1 }}>
+                        Mindful: {spendingProfile.mindfulPercentage}% of reflected expenses
+                      </AppText>
+                    </View>
+                    <View style={{ width: '100%', flexShrink: 1 }}>
+                      <AppText variant="captionMedium" color={p.textSecondary} style={{ flexShrink: 1 }}>
+                        Impulse: {100 - spendingProfile.mindfulPercentage}% of reflected expenses
+                      </AppText>
+                    </View>
                   </View>
                 </>
               ) : (
@@ -418,7 +559,7 @@ export default function InsightsScreen() {
                     <View key={ref} style={{ gap: Spacing.eight }}>
                       <View style={[ui.row, { justifyContent: 'space-between' }]}>
                         <AppText variant="bodyMedium" weight="600">
-                          {ref}
+                          {ref === 'Just wanted it' ? 'Just Wanted It' : ref}
                         </AppText>
                         <AppText variant="captionMedium" color={p.textSecondary} tabular>
                           {count} ({Math.round(ratio * 100)}%)
@@ -439,7 +580,7 @@ export default function InsightsScreen() {
             {/* Spending Trend with Daily / Weekly / Monthly Switch */}
             <View style={{ gap: Spacing.twelve }}>
               <SectionTitle
-                title="Spending trend"
+                title="Spending Trend"
                 detail="Interactive chart with date and amount inspection"
               />
               <DailySpendTrendChart
@@ -454,8 +595,8 @@ export default function InsightsScreen() {
             {/* Calendar Heatmap with Red, Yellow, Green upon spending */}
             <View style={{ gap: Spacing.twelve }}>
               <SectionTitle
-                title="Calendar & heat map"
-                detail="Daily spend intensity: Red (high), Yellow (moderate), Green (low/zero)"
+                title="Calendar & Heat Map"
+                detail="Daily Spend Intensity: Red (High), Yellow (Moderate), Green (Low/Zero)"
               />
               <ExpenseCalendarHeatmap expenses={expenses} currency={preferences.currency} />
             </View>

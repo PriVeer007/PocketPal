@@ -47,11 +47,11 @@ export default function EditExpenseScreen() {
 
   if (!expense) {
     return (
-      <Screen title="Spend not found" hasBottomNav={false}>
+      <Screen title="Spend Not Found" hasBottomNav={false}>
         <AppText variant="body" color={p.textSecondary}>
           This expense may have been deleted.
         </AppText>
-        <ActionButton label="Back to activity" onPress={() => router.back()} />
+        <ActionButton label="Back To Activity" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -109,12 +109,12 @@ export default function EditExpenseScreen() {
       <Screen
         scroll={false}
         hasBottomNav={false}
-        title="Edit spend"
+        title="Edit Spend"
         action={
           <Pressable
             onPress={() => router.back()}
             accessibilityRole="button"
-            accessibilityLabel="Cancel edit"
+            accessibilityLabel="Cancel Edit"
             hitSlop={8}
             style={ui.textAction}
           >
@@ -148,14 +148,14 @@ export default function EditExpenseScreen() {
                 placeholder="0.00"
                 placeholderTextColor={p.textSecondary}
                 style={[styles.amountInput, { color: p.text }]}
-                accessibilityLabel="Spend amount"
+                accessibilityLabel="Spend Amount"
               />
             </View>
           </Surface>
 
           {/* Title Input */}
           <View style={{ gap: 8 }}>
-            <AppText variant="captionMedium">What was it for?</AppText>
+            <AppText variant="captionMedium">What Was It For?</AppText>
             <TextInput
               value={title}
               onChangeText={(v) => {
@@ -174,7 +174,7 @@ export default function EditExpenseScreen() {
                   backgroundColor: p.backgroundElement,
                 },
               ]}
-              accessibilityLabel="Spend description"
+              accessibilityLabel="Spend Description"
             />
           </View>
 
@@ -221,7 +221,7 @@ export default function EditExpenseScreen() {
           >
             <View style={{ gap: 2, flex: 1 }}>
               <AppText variant="bodyMedium" weight="600">
-                Optional reflection
+                Optional Reflection
               </AppText>
               <AppText variant="caption" color={p.textSecondary}>
                 Notice what was behind this choice
@@ -258,7 +258,7 @@ export default function EditExpenseScreen() {
                         variant="captionMedium"
                         color={active ? onAccent : p.text}
                       >
-                        {item}
+                        {item === 'Just wanted it' ? 'Just Wanted It' : item}
                       </AppText>
                     </Pressable>
                   );
@@ -280,7 +280,7 @@ export default function EditExpenseScreen() {
                     backgroundColor: p.backgroundElement,
                   },
                 ]}
-                accessibilityLabel="Optional spend note"
+                accessibilityLabel="Optional Spend Note"
               />
             </Surface>
           ) : null}
@@ -292,7 +292,7 @@ export default function EditExpenseScreen() {
           ) : null}
 
           <ActionButton
-            label={saving ? 'Saving changes…' : 'Save changes'}
+            label={saving ? 'Saving Changes…' : 'Save Changes'}
             onPress={() => {
               void submit();
             }}

@@ -114,7 +114,7 @@ export function Screen({
   const scrollContentBottomPadding = bottomPadding + bottomClearance;
 
   const content = (
-    <View style={styles.screenContent}>
+    <View style={[styles.screenContent, !scroll && styles.screenContentFill]}>
       {title ? (
         <ScreenMotion style={styles.header}>
           <View style={{ flex: 1, gap: 4 }}>
@@ -130,7 +130,9 @@ export function Screen({
           {action}
         </ScreenMotion>
       ) : null}
-      <ScreenMotion style={styles.screenBody}>{children}</ScreenMotion>
+      <ScreenMotion style={[styles.screenBody, !scroll && styles.screenBodyFill]}>
+        {children}
+      </ScreenMotion>
     </View>
   );
 
@@ -421,7 +423,7 @@ export function FloatingAdd() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Add new spend"
+      accessibilityLabel="Add New Spend"
       onPress={() => router.push('/add')}
       style={({ pressed }) => [
         styles.fab,
@@ -552,7 +554,7 @@ export function DailySpendTrendChart({
       <View
         style={[styles.chartContainer, { height: height + 20, borderColor: p.border, backgroundColor: p.backgroundElement }]}
         accessibilityRole="image"
-        accessibilityLabel="Empty spending trend chart"
+        accessibilityLabel="Empty Spending Trend Chart"
       >
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.eight, paddingHorizontal: Spacing.sixteen }}>
           <AppText variant="captionMedium" color={p.textSecondary}>
@@ -616,7 +618,7 @@ export function DailySpendTrendChart({
       {/* Header with active selection/peak tooltip */}
       <View style={[ui.row, { justifyContent: 'space-between', marginBottom: 8 }]}>
         <AppText variant="eyebrow" color={p.textSecondary}>
-          {granularity ? `${granularity.toUpperCase()} SPEND` : 'SPENDING PATTERN'}
+          {granularity ? `${granularity[0].toUpperCase()}${granularity.slice(1)} Spend` : 'Spending Pattern'}
         </AppText>
         {activeDay && activeDay.amountMinor > 0 ? (
           <View style={[styles.peakBadge, { backgroundColor: p.backgroundSelected, borderColor: p.border }]}>
@@ -847,7 +849,7 @@ export function StreakCard({ expenses }: { expenses: Expense[] }) {
         <View style={{ flex: 1, gap: Spacing.two }}>
           <View style={[ui.row, { gap: Spacing.eight }]}>
             <AppText variant="headline">
-              {streak.currentStreak} {streak.currentStreak === 1 ? 'day' : 'days'} streak
+              {streak.currentStreak} {streak.currentStreak === 1 ? 'Day' : 'Days'} Streak
             </AppText>
             {streak.loggedToday ? (
               <View
@@ -859,7 +861,7 @@ export function StreakCard({ expenses }: { expenses: Expense[] }) {
                 }}
               >
                 <AppText variant="captionMedium" color={p.accent} size={11}>
-                  Logged today
+                  Logged Today
                 </AppText>
               </View>
             ) : null}
@@ -932,7 +934,7 @@ export function ExpenseCalendarHeatmap({
         <Pressable
           onPress={prevMonth}
           accessibilityRole="button"
-          accessibilityLabel="Previous month"
+          accessibilityLabel="Previous Month"
           hitSlop={10}
           style={styles.calNavBtn}
         >
@@ -946,7 +948,7 @@ export function ExpenseCalendarHeatmap({
         <Pressable
           onPress={nextMonth}
           accessibilityRole="button"
-          accessibilityLabel="Next month"
+          accessibilityLabel="Next Month"
           hitSlop={10}
           style={styles.calNavBtn}
         >
@@ -1109,7 +1111,7 @@ export function ExpenseCalendarHeatmap({
               })}
             </AppText>
             <AppText variant="captionMedium" color={selectedDay.isZeroSpend ? p.accent : p.text} tabular>
-              {selectedDay.isZeroSpend ? 'Zero spend day' : formatMoney(selectedDay.amountMinor, currency)}
+              {selectedDay.isZeroSpend ? 'Zero-Spend Day' : formatMoney(selectedDay.amountMinor, currency)}
             </AppText>
           </View>
 
@@ -1185,10 +1187,16 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sixteen,
     gap: Spacing.twenty,
   },
+  screenContentFill: {
+    flex: 1,
+  },
   screenBody: {
     width: '100%',
     flexDirection: 'column',
     gap: Spacing.sixteen,
+  },
+  screenBodyFill: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',

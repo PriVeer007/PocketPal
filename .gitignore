@@ -49,3 +49,6 @@ build/
 !.env.example
 
 android-build.log
+
+# Private developer reference documentation
+private-documentation/

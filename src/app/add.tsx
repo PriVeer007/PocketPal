@@ -19,6 +19,7 @@ import {
   useAccentForeground,
   usePalette,
 } from '@/components/app-ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CYCLE_BUDGET_TOP_UP_SOURCE, localDateKey, toMinorUnits, validateExpense } from '@/finance.mjs';
 import { CATEGORIES, Category, Reflection, useFinance } from '@/store';
 import { Spacing } from '@/constants/theme';
@@ -31,6 +32,7 @@ const INCOME_SOURCES = [CYCLE_BUDGET_TOP_UP_SOURCE, 'Scholarship', 'Part-time wo
 export default function AddExpenseScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
+  const insets = useSafeAreaInsets();
   const { preferences, addExpense, addIncome, logZeroSpendDay } = useFinance();
   const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const submitLock = useRef(false);
@@ -168,8 +170,8 @@ export default function AddExpenseScreen() {
     if (willShow) {
       // Scroll to bottom when reflection opens so the button stays visible
       setTimeout(() => {
-        scrollRef.current?.scrollToEnd({ animated: true });
-      }, 200);
+        scrollRef.current?.scrollToEnd({ animated: false });
+      }, 120);
     }
   };
 
@@ -177,12 +179,11 @@ export default function AddExpenseScreen() {
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: p.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <Screen
         scroll={false}
         hasBottomNav={false}
-        title={entryMode === 'income' ? 'Add income' : 'Add spend'}
+        title={entryMode === 'income' ? 'Add Income' : 'Add Spend'}
         action={
           <Pressable
             onPress={() => router.back()}
@@ -199,8 +200,13 @@ export default function AddExpenseScreen() {
       >
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={{ paddingBottom: 32, gap: 16 }}
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingBottom: Math.max(32, insets.bottom + 24),
+            gap: 16,
+          }}
           keyboardShouldPersistTaps="handled"
+          bounces
           showsVerticalScrollIndicator={false}
         >
           {/* Expense / Income Toggle */}
@@ -248,7 +254,7 @@ export default function AddExpenseScreen() {
             {[
               { id: 0 as const, label: 'Today' },
               { id: 1 as const, label: 'Yesterday' },
-              { id: 2 as const, label: '2 days ago' },
+              { id: 2 as const, label: '2 Days Ago' },
             ].map((opt) => {
               const active = dateOffset === opt.id;
               return (
@@ -292,7 +298,7 @@ export default function AddExpenseScreen() {
             >
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="bodyMedium" weight="600" color={isZeroLog ? p.accent : p.text}>
-                  Zero-spend day
+                  Zero-Spend Day
                 </AppText>
                 <AppText variant="caption" color={p.textSecondary}>
                   Log a zero-spend day to keep your streak alive without recording an expense.
@@ -326,7 +332,6 @@ export default function AddExpenseScreen() {
                     placeholderTextColor={p.textSecondary}
                     style={[styles.amountInput, { color: p.text }]}
                     accessibilityLabel={entryMode === 'income' ? 'Income amount' : 'Spend amount'}
-                    autoFocus
                   />
                 </View>
               </Surface>
@@ -334,7 +339,7 @@ export default function AddExpenseScreen() {
               {/* Title Input */}
               <View style={{ gap: 8 }}>
                 <AppText variant="captionMedium">
-                  {entryMode === 'income' ? 'Income source' : 'What was it for?'}
+                  {entryMode === 'income' ? 'Income Source' : 'What Was It For?'}
                 </AppText>
                 <TextInput
                   value={title}
@@ -361,7 +366,7 @@ export default function AddExpenseScreen() {
               {/* Category Chips */}
               <View style={{ gap: 8 }}>
                 <AppText variant="captionMedium">
-                  {entryMode === 'income' ? 'Source type' : 'Category'}
+                  {entryMode === 'income' ? 'Source Type' : 'Category'}
                 </AppText>
                 <View style={[styles.categoryRow, entryMode === 'income' && styles.incomeSourceRow]}>
                   {(entryMode === 'income' ? INCOME_SOURCES : CATEGORIES).map((option) => {
@@ -391,7 +396,7 @@ export default function AddExpenseScreen() {
                           weight={active ? '600' : '500'}
                           color={active ? p.accent : p.text}
                         >
-                          {option}
+                          {option === 'Part-time work' ? 'Part-Time Work' : option}
                         </AppText>
                       </Pressable>
                     );
@@ -405,13 +410,13 @@ export default function AddExpenseScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityState={{ expanded: showReflection }}
-                    accessibilityLabel="Toggle optional reflection"
+                    accessibilityLabel="Toggle Optional Reflection"
                     onPress={handleToggleReflection}
                     style={styles.reflectionToggle}
                   >
                     <View style={{ gap: 2, flex: 1 }}>
                       <AppText variant="bodyMedium" weight="600">
-                        Quick check (Behavioural)
+                        Quick Check (Behavioural)
                       </AppText>
                       <AppText variant="caption" color={p.textSecondary}>
                         Was this purchase planned or spontaneous?
@@ -425,7 +430,7 @@ export default function AddExpenseScreen() {
                   {showReflection ? (
                     <Surface style={{ gap: 12 }}>
                       <AppText variant="captionMedium" color={p.textSecondary}>
-                        Was this a planned expense?
+                        Was This A Planned Expense?
                       </AppText>
                       <View style={styles.reflectionRow}>
                         {reflections.map((item) => {
@@ -448,7 +453,7 @@ export default function AddExpenseScreen() {
                                 variant="captionMedium"
                                 color={active ? onAccent : p.text}
                               >
-                                {item}
+                                {item === 'Just wanted it' ? 'Just Wanted It' : item}
                               </AppText>
                             </Pressable>
                           );
@@ -475,7 +480,7 @@ export default function AddExpenseScreen() {
                             backgroundColor: p.backgroundElement,
                           },
                         ]}
-                        accessibilityLabel="Optional spend note"
+                        accessibilityLabel="Optional Spend Note"
                       />
                     </Surface>
                   ) : null}
@@ -495,10 +500,10 @@ export default function AddExpenseScreen() {
               saving
                 ? 'Saving…'
                 : isZeroLog
-                ? 'Log zero-spend day'
+                ? 'Log Zero-Spend Day'
                 : entryMode === 'income'
-                ? 'Add income'
-                : 'Record spend'
+                ? 'Add Income'
+                : 'Record Spend'
             }
             onPress={() => {
               void submit();

@@ -46,14 +46,15 @@ function ActivityRow({ record, currency }: { record: ActivityRecord; currency: s
     isExpense || isIncome
       ? record.title
       : record.type === 'goalClosure'
-      ? 'Goal closed'
+      ? 'Goal Closed'
       : isAllocation
-      ? 'Savings allocation'
-      : 'Savings withdrawal';
+      ? 'Savings Allocation'
+      : 'Savings Withdrawal';
+  const incomeSource = record.description === 'Part-time work' ? 'Part-Time Work' : record.description;
   const detail = isExpense
     ? `${record.category} · ${time}`
     : isIncome
-    ? `Income${record.description ? ` · ${record.description}` : ''} · ${time}`
+    ? `Income${incomeSource ? ` · ${incomeSource}` : ''} · ${time}`
     : `${record.goalName ?? 'Savings goal'} · ${time}`;
 
   return (
@@ -181,12 +182,12 @@ export default function Dashboard() {
     <AppScaffold>
       <Screen
         eyebrow="Allowance Cycle"
-        title={preferences.name ? `Hello, ${preferences.name}.` : 'Hello.'}
+        title={preferences.name ? `Hello, ${preferences.name}!` : 'Hello!'}
         action={
           <Pressable
             onPress={() => router.push('/profile')}
             accessibilityRole="button"
-            accessibilityLabel="Open settings and profile"
+            accessibilityLabel="Open Settings And Profile"
           >
             <View
               style={[
@@ -261,10 +262,10 @@ export default function Dashboard() {
           <Surface
             style={styles.metricCard}
             onPress={() => router.push('/profile')}
-            accessibilityLabel="Adjust daily pacing in profile"
+            accessibilityLabel="Adjust Daily Pacing In Profile"
           >
             <AppText variant="caption" color={p.textSecondary}>
-              {preferences.pacingMode === 'adaptive' ? 'Adaptive room' : 'Daily target'}
+              {preferences.pacingMode === 'adaptive' ? 'Adaptive Room' : 'Daily Target'}
             </AppText>
             <AppText variant="title" weight="700" tabular>
               {formatMoney(displayDailyRoom, preferences.currency)}
@@ -276,7 +277,7 @@ export default function Dashboard() {
 
           <Surface style={styles.metricCard}>
             <AppText variant="caption" color={p.textSecondary}>
-              Daily average
+              Daily Average
             </AppText>
             <AppText variant="title" weight="700" tabular>
               {formatMoney(dailyPace, preferences.currency)}
@@ -293,7 +294,7 @@ export default function Dashboard() {
         {/* Spending Trend Graph */}
         <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
-            title="Spending trend"
+            title="Spending Trend"
             detail="Daily spending recorded this cycle"
             actionLabel="Insights"
             onPress={() => router.push('/insights')}
@@ -310,7 +311,7 @@ export default function Dashboard() {
         {/* Category Guardrails */}
         <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
-            title="Category budgets"
+            title="Category Budgets"
             detail="Limits to keep spending in perspective"
             actionLabel="Adjust"
             onPress={() => router.push('/profile')}
@@ -352,18 +353,18 @@ export default function Dashboard() {
             })
           ) : (
             <Surface style={{ backgroundColor: p.accentSoft, borderColor: p.accentSoft, gap: Spacing.eight }}>
-              <AppText variant="headline">Set your first category limit</AppText>
+              <AppText variant="headline">Set Your First Category Limit</AppText>
               <AppText variant="body" color={p.textSecondary}>
                 Choose a category like Food or Social to set a boundary that leaves room to live.
               </AppText>
               <Pressable
                 onPress={() => router.push('/profile')}
                 accessibilityRole="button"
-                accessibilityLabel="Set category budgets"
+                accessibilityLabel="Set Category Budgets"
                 hitSlop={8}
               >
                 <AppText variant="bodyMedium" weight="600" color={p.accent}>
-                  Set a category budget →
+                  Set A Category Budget →
                 </AppText>
               </Pressable>
             </Surface>
@@ -373,8 +374,8 @@ export default function Dashboard() {
         {/* Recent Activity */}
         <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
-            title="Recent activity"
-            actionLabel={recent.length ? 'See all' : undefined}
+            title="Recent Activity"
+            actionLabel={recent.length ? 'See All' : undefined}
             onPress={() => router.push('/activity')}
           />
           {recent.length ? (
@@ -390,7 +391,7 @@ export default function Dashboard() {
             </Surface>
           ) : (
             <Surface style={{ gap: Spacing.eight }}>
-              <AppText variant="headline">No activity recorded yet</AppText>
+              <AppText variant="headline">No Activity Recorded Yet</AppText>
               <AppText variant="body" color={p.textSecondary}>
                 Your expenses, income, and savings updates will appear here.
               </AppText>
