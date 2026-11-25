@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f6f5f0;
+  --color-paper-elevated: #eaece6;
+  --color-surface: #ffffff;
+  --color-ink: #18201c;
+  --color-ink-muted: #56645e;
+  --color-forest: #1b4d41;
+  --color-forest-deep: #111613;
+  --color-forest-surface: #18201b;
+  --color-forest-card: #222d26;
+  --color-mint: #52b792;
+  --color-mint-soft: #deeae3;
+  --color-border-subtle: #dfe3dc;
+  --color-clay: #9e4d2b;
+  --color-ochre: #c9975b;
+
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    margin: 0;
+    overflow-x: clip;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-forest);
+    outline-offset: 3px;
+  }
+
+  .dark-surface :focus-visible {
+    outline-color: var(--color-mint);
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Native <details> FAQ accordion styling per modern-web-guidance */
+.faq-accordion details {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.faq-accordion summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  padding-block: 1.25rem;
+  font-weight: 600;
+  font-size: 1.0625rem;
+  line-height: 1.45;
+  color: var(--color-ink);
+  transition: color 0.18s ease;
+}
+
+.faq-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-accordion summary:hover {
+  color: var(--color-forest);
+}
+
+.faq-accordion summary .faq-chevron {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--color-ink-muted);
+  transform: rotate(0deg);
+}
+
+.faq-accordion details[open] > summary .faq-chevron {
+  transform: rotate(180deg);
+  color: var(--color-forest);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .faq-accordion summary .faq-chevron {
+    transition: transform 0.22s ease, color 0.18s ease;
+  }
+}
+
+.faq-accordion details::details-content {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+  contain: layout;
+}
+
+.faq-accordion details:not([open])::details-content {
+  block-size: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .faq-accordion details::details-content {
+    transition: block-size 0.28s ease-in-out, content-visibility 0.28s ease-in-out;
+    transition-behavior: allow-discrete;
+  }
+}
+
+/* Subtle custom scrollbar inside interactive device screen preview */
+.phone-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.phone-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.phone-scroll::-webkit-scrollbar-thumb {
+  background: rgba(27, 77, 65, 0.25);
+  border-radius: 9999px;
+}
