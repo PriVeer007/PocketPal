@@ -8,18 +8,25 @@ import {
   ui,
   useAccentForeground,
   usePalette,
-} from '@/components/app-ui';
+} from "@/components/app-ui";
+import { Spacing } from "@/constants/theme";
 import {
   currencyDigits,
   generateBackupJSON,
   generateExpensesCSV,
   toMinorUnits,
-} from '@/finance.mjs';
-import { CATEGORIES, Category, useFinance } from '@/store';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
-import { Spacing } from '@/constants/theme';
+} from "@/finance.mjs";
+import { CATEGORIES, Category, useFinance } from "@/store";
+import { router } from "expo-router";
+import { useState } from "react";
+import {
+  Alert,
+  Pressable,
+  Share,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 
 function formatMinorToInput(minor: number, currency: string) {
   const digits = currencyDigits(currency);
@@ -29,142 +36,169 @@ function formatMinorToInput(minor: number, currency: string) {
 export default function ProfileScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
-  const { preferences, expenses, incomes, goals, goalRecords, goalTransactions, budgets, zeroSpendDays, savePreferences, saveBudget, resetAllData } = useFinance();
+  const {
+    preferences,
+    expenses,
+    incomes,
+    goals,
+    goalRecords,
+    goalTransactions,
+    budgets,
+    zeroSpendDays,
+    savePreferences,
+    saveBudget,
+    resetAllData,
+  } = useFinance();
 
   const [name, setName] = useState(preferences.name);
-  const [allowance, setAllowance] = useState(formatMinorToInput(preferences.allowanceMinor, preferences.currency));
+  const [allowance, setAllowance] = useState(
+    formatMinorToInput(preferences.allowanceMinor, preferences.currency),
+  );
   const [budgetDrafts, setBudgetDrafts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      CATEGORIES.map((cat) => [cat, formatMinorToInput(budgets[cat] ?? 0, preferences.currency)])
-    )
+      CATEGORIES.map((cat) => [
+        cat,
+        formatMinorToInput(budgets[cat] ?? 0, preferences.currency),
+      ]),
+    ),
   );
-  const [pendingPacingMode, setPendingPacingMode] = useState(preferences.pacingMode);
+  const [pendingPacingMode, setPendingPacingMode] = useState(
+    preferences.pacingMode,
+  );
 
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
 
   const exportCSV = async () => {
     try {
       const csv = generateExpensesCSV(expenses, preferences.currency);
       await Share.share({
-        title: 'PocketPal Expenses Export',
+        title: "PocketPal Expenses Export",
         message: csv,
       });
-      setNotice('Expense CSV ready to share.');
+      setNotice("Expense CSV ready to share.");
     } catch {
-      setError('Could not export your spending CSV.');
+      setError("Could not export your spending CSV.");
     }
   };
 
   const exportJSON = async () => {
     try {
-      const backup = generateBackupJSON(preferences, expenses, goalRecords, budgets, zeroSpendDays, incomes, goalTransactions);
+      const backup = generateBackupJSON(
+        preferences,
+        expenses,
+        goalRecords,
+        budgets,
+        zeroSpendDays,
+        incomes,
+        goalTransactions,
+      );
       await Share.share({
-        title: 'PocketPal SQLite Backup',
+        title: "PocketPal SQLite Backup",
         message: backup,
       });
-      setNotice('Database backup ready to save.');
+      setNotice("Database backup ready to save.");
     } catch {
-      setError('Could not generate backup file.');
+      setError("Could not generate backup file.");
     }
   };
 
   const handleResetAllData = () => {
     Alert.alert(
-      'Reset all data?',
-      'All local SQLite records (expenses, incomes, zero-spend days, goals, and budgets) will be permanently cleared from this device.',
+      "Reset All Data?",
+      "All local SQLite records (expenses, incomes, zero-spend days, goals, and budgets) will be permanently cleared from this device.",
       [
-        { text: 'Keep my data', style: 'cancel' },
+        { text: "Keep My Data", style: "cancel" },
         {
-          text: 'Reset everything',
-          style: 'destructive',
+          text: "Reset Everything",
+          style: "destructive",
           onPress: () => {
             void resetAllData();
           },
         },
-      ]
+      ],
     );
   };
 
   const saveAllowance = async () => {
-    const num = Number(allowance.replace(/,/g, ''));
+    const num = Number(allowance.replace(/,/g, ""));
     const minor = toMinorUnits(num, preferences.currency);
     if (!minor) {
-      setError('Enter an allowance amount greater than zero.');
+      setError("Enter an allowance amount greater than zero.");
       return;
     }
     try {
       await savePreferences({ allowanceMinor: minor });
-      setError('');
-      setNotice('Monthly allowance updated.');
+      setError("");
+      setNotice("Monthly allowance updated.");
     } catch {
-      setError('Could not update your allowance.');
+      setError("Could not update your allowance.");
     }
   };
 
   const saveName = async () => {
     if (name.trim().length > 32) {
-      setError('Keep your name under 32 characters.');
+      setError("Keep your name under 32 characters.");
       return;
     }
     try {
       await savePreferences({ name: name.trim() });
-      setError('');
-      setNotice('Profile name updated.');
+      setError("");
+      setNotice("Profile name updated.");
     } catch {
-      setError('Could not update your profile name.');
+      setError("Could not update your profile name.");
     }
   };
 
   const saveCategoryBudget = async (category: Category) => {
-    const parsed = Number((budgetDrafts[category] ?? '').replace(/,/g, ''));
+    const parsed = Number((budgetDrafts[category] ?? "").replace(/,/g, ""));
     if (!Number.isFinite(parsed) || parsed < 0) {
-      setError('Enter a valid category amount (0 to remove).');
+      setError("Enter a valid category amount (0 to remove).");
       return;
     }
     try {
       const minor = toMinorUnits(parsed, preferences.currency) ?? 0;
       await saveBudget(category, minor);
-      setError('');
+      setError("");
       setNotice(`${category} budget updated.`);
     } catch {
-      setError('Could not update category budget.');
+      setError("Could not update category budget.");
     }
   };
 
   const changeCycleDay = async (day: number) => {
     try {
       await savePreferences({ cycleStartDay: day });
-      setError('');
+      setError("");
       setNotice(`Allowance cycle now starts on day ${day}.`);
     } catch {
-      setError('Could not update cycle start day.');
+      setError("Could not update cycle start day.");
     }
   };
 
-  const changeAppearance = async (mode: 'system' | 'light' | 'dark') => {
+  const changeAppearance = async (mode: "system" | "light" | "dark") => {
     try {
       await savePreferences({ themeMode: mode });
-      setError('');
-      setNotice('Appearance updated.');
+      setError("");
+      setNotice("Appearance updated.");
     } catch {
-      setError('Could not update appearance.');
+      setError("Could not update appearance.");
     }
   };
 
-  const changePacingMode = async (mode: 'adaptive' | 'fixed') => {
+  const changePacingMode = async (mode: "adaptive" | "fixed") => {
     try {
       await savePreferences({ pacingMode: mode });
-      setError('');
-      setNotice(`Pacing set to ${mode === 'adaptive' ? 'Adaptive' : 'Fixed'}.`);
+      setError("");
+      setNotice(`Pacing set to ${mode === "adaptive" ? "Adaptive" : "Fixed"}.`);
     } catch {
-      setError('Could not update daily pacing mode.');
+      setError("Could not update daily pacing mode.");
     }
   };
 
   return (
     <AppScaffold showFloatingAdd={false}>
-      <Screen eyebrow="Your setup" title="Profile & settings">
+      <Screen eyebrow="Your Setup" title="Profile & Settings">
         {/* Profile Card */}
         <Surface>
           <View style={[ui.row, { gap: Spacing.twelve }]}>
@@ -178,7 +212,7 @@ export default function ProfileScreen() {
               ]}
             >
               <AppText variant="headline" color={p.accent}>
-                {(name ? name.slice(0, 1) : 'P').toUpperCase()}
+                {(name ? name.slice(0, 1) : "P").toUpperCase()}
               </AppText>
             </View>
 
@@ -191,12 +225,15 @@ export default function ProfileScreen() {
                   value={name}
                   onChangeText={(v) => {
                     setName(v);
-                    setNotice('');
+                    setNotice("");
                   }}
                   maxLength={32}
                   placeholder="First name (optional)"
                   placeholderTextColor={p.textSecondary}
-                  style={[styles.nameInput, { color: p.text, borderBottomColor: p.border }]}
+                  style={[
+                    styles.nameInput,
+                    { color: p.text, borderBottomColor: p.border },
+                  ]}
                 />
                 <Pressable
                   onPress={() => {
@@ -223,11 +260,14 @@ export default function ProfileScreen() {
           <Surface
             style={{
               padding: Spacing.twelve,
-              backgroundColor: error ? (p.warning + '22') : p.accentSoft,
+              backgroundColor: error ? p.warning + "22" : p.accentSoft,
               borderColor: error ? p.warning : p.accent,
             }}
           >
-            <AppText variant="captionMedium" color={error ? p.warning : p.accent}>
+            <AppText
+              variant="captionMedium"
+              color={error ? p.warning : p.accent}
+            >
               {error || notice}
             </AppText>
           </Surface>
@@ -235,7 +275,10 @@ export default function ProfileScreen() {
 
         {/* Allowance & Cycle */}
         <View style={{ gap: Spacing.twelve }}>
-          <SectionTitle title="Allowance cycle" detail="The amount you plan your everyday spending around" />
+          <SectionTitle
+            title="Allowance Cycle"
+            detail="The amount you plan your everyday spending around"
+          />
           <Surface style={{ gap: Spacing.twelve }}>
             <AppText variant="eyebrow" color={p.textSecondary}>
               MONTHLY ALLOWANCE ({preferences.currency})
@@ -244,8 +287,8 @@ export default function ProfileScreen() {
               <TextInput
                 value={allowance}
                 onChangeText={(v) => {
-                  setAllowance(v.replace(/[^0-9.]/g, ''));
-                  setNotice('');
+                  setAllowance(v.replace(/[^0-9.]/g, ""));
+                  setNotice("");
                 }}
                 keyboardType="decimal-pad"
                 style={[
@@ -257,7 +300,7 @@ export default function ProfileScreen() {
                     borderColor: p.border,
                   },
                 ]}
-                accessibilityLabel="Monthly allowance"
+                accessibilityLabel="Monthly Allowance"
               />
               <ActionButton
                 label="Update"
@@ -269,7 +312,7 @@ export default function ProfileScreen() {
 
             <View style={{ gap: Spacing.eight, marginTop: Spacing.four }}>
               <AppText variant="caption" color={p.textSecondary}>
-                Cycle reset day of each month
+                Cycle Reset Day Of Each Month
               </AppText>
               <View style={styles.cycleChips}>
                 {[1, 5, 10, 15, 20, 25].map((day) => {
@@ -285,7 +328,9 @@ export default function ProfileScreen() {
                       style={[
                         styles.cycleChip,
                         {
-                          backgroundColor: active ? p.accent : p.backgroundSelected,
+                          backgroundColor: active
+                            ? p.accent
+                            : p.backgroundSelected,
                         },
                       ]}
                     >
@@ -294,7 +339,7 @@ export default function ProfileScreen() {
                         color={active ? onAccent : p.text}
                       >
                         {day}
-                        {day === 1 ? 'st' : 'th'}
+                        {day === 1 ? "st" : "th"}
                       </AppText>
                     </Pressable>
                   );
@@ -307,7 +352,7 @@ export default function ProfileScreen() {
         {/* Category Budgets */}
         <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
-            title="Category budgets"
+            title="Category Budgets"
             detail="Optional guardrails for categories that matter to you"
           />
           <Surface style={{ gap: Spacing.sixteen }}>
@@ -318,11 +363,11 @@ export default function ProfileScreen() {
                 </AppText>
                 <View style={[ui.row, { gap: Spacing.eight }]}>
                   <TextInput
-                    value={budgetDrafts[cat] ?? '0'}
+                    value={budgetDrafts[cat] ?? "0"}
                     onChangeText={(v) =>
                       setBudgetDrafts((old) => ({
                         ...old,
-                        [cat]: v.replace(/[^0-9.]/g, ''),
+                        [cat]: v.replace(/[^0-9.]/g, ""),
                       }))
                     }
                     keyboardType="decimal-pad"
@@ -340,7 +385,7 @@ export default function ProfileScreen() {
                     accessibilityLabel={`${cat} budget`}
                   />
                   <ActionButton
-                    label={budgets[cat] ? 'Update' : 'Set limit'}
+                    label={budgets[cat] ? "Update" : "Set Limit"}
                     variant="quiet"
                     onPress={() => {
                       void saveCategoryBudget(cat);
@@ -354,11 +399,17 @@ export default function ProfileScreen() {
 
         {/* Appearance Mode */}
         <View style={{ gap: Spacing.twelve }}>
-          <SectionTitle title="Appearance" detail="Follows system appearance by default" />
+          <SectionTitle
+            title="Appearance"
+            detail="Follows system appearance by default"
+          />
           <Surface style={styles.appearanceRow}>
-            {(['system', 'light', 'dark'] as const).map((mode) => {
+            {(["system", "light", "dark"] as const).map((mode) => {
               const active = preferences.themeMode === mode;
-              const label = mode === 'system' ? 'Device' : mode[0].toUpperCase() + mode.slice(1);
+              const label =
+                mode === "system"
+                  ? "Device"
+                  : mode[0].toUpperCase() + mode.slice(1);
               return (
                 <Pressable
                   key={mode}
@@ -370,7 +421,7 @@ export default function ProfileScreen() {
                   style={[
                     styles.appearanceOption,
                     {
-                      backgroundColor: active ? p.accent : 'transparent',
+                      backgroundColor: active ? p.accent : "transparent",
                     },
                   ]}
                 >
@@ -389,15 +440,15 @@ export default function ProfileScreen() {
         {/* Daily Budget Pacing Mode */}
         <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
-            title="Daily budget pacing"
+            title="Daily Budget Pacing"
             detail="Choose how unspent daily allowance is handled"
           />
           <Surface style={{ gap: Spacing.twelve }}>
             <View style={styles.appearanceRow}>
               {(
                 [
-                  { id: 'adaptive' as const, label: 'Adaptive' },
-                  { id: 'fixed' as const, label: 'Fixed' },
+                  { id: "adaptive" as const, label: "Adaptive" },
+                  { id: "fixed" as const, label: "Fixed" },
                 ] as const
               ).map((opt) => {
                 const active = pendingPacingMode === opt.id;
@@ -410,7 +461,7 @@ export default function ProfileScreen() {
                     style={[
                       styles.appearanceOption,
                       {
-                        backgroundColor: active ? p.accent : 'transparent',
+                        backgroundColor: active ? p.accent : "transparent",
                       },
                     ]}
                   >
@@ -425,19 +476,27 @@ export default function ProfileScreen() {
               })}
             </View>
 
-            <Surface style={{ gap: Spacing.eight, backgroundColor: p.accentSoft, borderColor: p.accentSoft }}>
+            <Surface
+              style={{
+                gap: Spacing.eight,
+                backgroundColor: p.accentSoft,
+                borderColor: p.accentSoft,
+              }}
+            >
               <AppText variant="captionMedium" color={p.accent}>
-                {pendingPacingMode === 'adaptive' ? 'HOW ADAPTIVE WORKS' : 'HOW FIXED WORKS'}
+                {pendingPacingMode === "adaptive"
+                  ? "HOW ADAPTIVE WORKS"
+                  : "HOW FIXED WORKS"}
               </AppText>
               <AppText variant="body" color={p.text}>
-                {pendingPacingMode === 'adaptive'
+                {pendingPacingMode === "adaptive"
                   ? "Didn't spend today? That money rolls over to tomorrow. Your daily budget grows when you save on zero-spend days."
-                  : 'Your allowance is split equally across every day. The daily target stays the same regardless of how much you spend or save.'}
+                  : "Your allowance is split equally across every day. The daily target stays the same regardless of how much you spend or save."}
               </AppText>
               <AppText variant="caption" color={p.textSecondary}>
-                {pendingPacingMode === 'adaptive'
-                  ? 'Example: \u20B96,000 for 30 days = \u20B9200/day. Skip a day \u2192 tomorrow becomes \u20B9207.'
-                  : 'Example: \u20B96,000 for 30 days = \u20B9200/day, every day, no matter what.'}
+                {pendingPacingMode === "adaptive"
+                  ? "Example: \u20B96,000 for 30 days = \u20B9200/day. Skip a day \u2192 tomorrow becomes \u20B9207."
+                  : "Example: \u20B96,000 for 30 days = \u20B9200/day, every day, no matter what."}
               </AppText>
             </Surface>
 
@@ -454,15 +513,20 @@ export default function ProfileScreen() {
 
         {/* Currency Protection Info */}
         <Surface style={{ gap: Spacing.four }}>
-          <AppText variant="headline">Currency &amp; records</AppText>
+          <AppText variant="headline">Currency &amp; Records</AppText>
           <AppText variant="body" color={p.textSecondary}>
-            Active currency: {preferences.currency}. Currency is locked once configured to prevent historical transaction records from being silently reinterpreted with different exchange units.
+            Active currency: {preferences.currency}. Currency is locked once
+            configured to prevent historical transaction records from being
+            silently reinterpreted with different exchange units.
           </AppText>
         </Surface>
 
         {/* About Section */}
         <View style={{ gap: Spacing.twelve }}>
-          <SectionTitle title="About PocketPal" detail="Created for mindful student finance" />
+          <SectionTitle
+            title="About PocketPal"
+            detail="Created for mindful student finance"
+          />
           <Surface style={{ gap: Spacing.twelve }}>
             <View style={[ui.row, { gap: Spacing.eight }]}>
               <View
@@ -471,8 +535,8 @@ export default function ProfileScreen() {
                   height: 36,
                   borderRadius: 12,
                   backgroundColor: p.accent,
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
                 <AppText variant="headline" color={onAccent} size={18}>
@@ -487,7 +551,12 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: p.border }} />
+            <View
+              style={{
+                height: StyleSheet.hairlineWidth,
+                backgroundColor: p.border,
+              }}
+            />
 
             <View style={{ gap: 4 }}>
               <AppText variant="eyebrow" color={p.accent}>
@@ -503,12 +572,26 @@ export default function ProfileScreen() {
                 Backend by Prithvi Veeresh
               </AppText>
               <AppText variant="body" color={p.textSecondary}>
-                Engineered with dedication to help college students navigate allowance cycles, build savings habits, and make everyday spending visible without judgment or cloud tracking.
+                Engineered with dedication to help college students navigate
+                allowance cycles, build savings habits, and make everyday
+                spending visible without judgment or cloud tracking.
               </AppText>
             </View>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.eight, marginTop: Spacing.four }}>
-              {['100% Offline SQLite', 'Zero Cloud Telemetry', 'No Bank Credentials', 'Open Architecture'].map((badge) => (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: Spacing.eight,
+                marginTop: Spacing.four,
+              }}
+            >
+              {[
+                "100% Offline SQLite",
+                "Zero Cloud Telemetry",
+                "No Bank Credentials",
+                "Open Architecture",
+              ].map((badge) => (
                 <View
                   key={badge}
                   style={{
@@ -530,34 +613,40 @@ export default function ProfileScreen() {
         {/* Data Portability & Backup */}
         <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
-            title="Data & offline backup"
+            title="Data & Offline Backup"
             detail="Export your records anytime or create portable backups"
           />
           <Surface style={{ gap: Spacing.twelve }}>
             <View style={{ gap: Spacing.four }}>
-              <AppText variant="headline">Export spreadsheet (CSV)</AppText>
+              <AppText variant="headline">Export Spreadsheet (CSV)</AppText>
               <AppText variant="caption" color={p.textSecondary}>
                 Open your spending history in Excel, Google Sheets, or Numbers.
               </AppText>
             </View>
             <ActionButton
-              label="Share expenses as CSV"
+              label="Share Expenses As CSV"
               variant="quiet"
               onPress={() => {
                 void exportCSV();
               }}
             />
 
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginVertical: Spacing.four }} />
+            <View
+              style={{
+                height: StyleSheet.hairlineWidth,
+                backgroundColor: p.border,
+                marginVertical: Spacing.four,
+              }}
+            />
 
             <View style={{ gap: Spacing.four }}>
-              <AppText variant="headline">Full database backup (JSON)</AppText>
+              <AppText variant="headline">Full Database Backup (JSON)</AppText>
               <AppText variant="caption" color={p.textSecondary}>
                 Save an offline snapshot of your preferences, spends, and goals.
               </AppText>
             </View>
             <ActionButton
-              label="Export database backup"
+              label="Export Database Backup"
               variant="quiet"
               onPress={() => {
                 void exportJSON();
@@ -565,31 +654,43 @@ export default function ProfileScreen() {
             />
 
             <ActionButton
-              label="Restore from JSON backup"
+              label="Restore From JSON Backup"
               variant="quiet"
               onPress={() => {
-                router.push('/restore');
+                router.push("/restore");
               }}
             />
 
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: p.border, marginVertical: Spacing.four }} />
+            <View
+              style={{
+                height: StyleSheet.hairlineWidth,
+                backgroundColor: p.border,
+                marginVertical: Spacing.four,
+              }}
+            />
 
             <View style={{ gap: Spacing.four }}>
-              <AppText variant="headline">Reset all records</AppText>
+              <AppText variant="headline">Reset All Records</AppText>
               <AppText variant="caption" color={p.textSecondary}>
                 Clear all SQLite data and start fresh for a new semester.
               </AppText>
             </View>
-            <ActionButton label="Reset all data" variant="danger" onPress={handleResetAllData} />
+            <ActionButton
+              label="Reset All Data"
+              variant="danger"
+              onPress={handleResetAllData}
+            />
           </Surface>
         </View>
 
         {/* Privacy & Storage Transparency */}
         <Surface style={{ gap: Spacing.four }}>
-          <AppText variant="headline">Private by design</AppText>
+          <AppText variant="headline">Private By Design</AppText>
           <AppText variant="body" color={p.textSecondary}>
-            {expenses.length} {expenses.length === 1 ? 'expense' : 'expenses'} and {goals.length}{' '}
-            {goals.length === 1 ? 'goal is' : 'goals are'} active in SQLite directly on this device. PocketPal does not connect to banks, cloud services, or external trackers.
+            {expenses.length} {expenses.length === 1 ? "expense" : "expenses"}{" "}
+            and {goals.length} {goals.length === 1 ? "goal is" : "goals are"}{" "}
+            active in SQLite directly on this device. PocketPal does not connect
+            to banks, cloud services, or external trackers.
           </AppText>
         </Surface>
       </Screen>
@@ -603,8 +704,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   nameInput: {
     flex: 1,
@@ -620,16 +721,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cycleChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.eight,
   },
   cycleChip: {
     borderRadius: 16,
     minHeight: 36,
     paddingHorizontal: Spacing.twelve,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   categoryBudgetInput: {
     flex: 1,
@@ -639,7 +740,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   appearanceRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.eight,
     padding: Spacing.eight,
   },
@@ -647,7 +748,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 40,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

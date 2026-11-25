@@ -96,7 +96,7 @@ export default function OnboardingScreen() {
 
           {/* Name Input */}
           <View style={{ gap: 8 }}>
-            <AppText variant="captionMedium">What should we call you?</AppText>
+            <AppText variant="captionMedium">What Should We Call You?</AppText>
             <TextInput
               value={name}
               onChangeText={setName}
@@ -112,14 +112,14 @@ export default function OnboardingScreen() {
                   borderColor: p.border,
                 },
               ]}
-              accessibilityLabel="Your first name"
+              accessibilityLabel="Your First Name"
             />
           </View>
 
           {/* Allowance Rhythm Surface */}
           <Surface style={{ gap: 16 }}>
             <View style={{ gap: 4 }}>
-              <AppText variant="headline">Your allowance rhythm</AppText>
+              <AppText variant="headline">Your Allowance Rhythm</AppText>
               <AppText variant="caption" color={p.textSecondary}>
                 Enter what you receive for one monthly cycle. You can adjust this anytime in settings.
               </AppText>
@@ -174,14 +174,14 @@ export default function OnboardingScreen() {
                 placeholder="0"
                 placeholderTextColor={p.textSecondary}
                 style={[styles.amountInput, { color: p.text }]}
-                accessibilityLabel="Monthly allowance amount"
+                accessibilityLabel="Monthly Allowance Amount"
               />
             </View>
 
             {/* Cycle Start Day */}
             <View style={{ gap: 8 }}>
               <AppText variant="caption" color={p.textSecondary}>
-                Cycle reset day of the month
+                Cycle Reset Day Of The Month
               </AppText>
               <View style={styles.cycleRow}>
                 {[1, 5, 10, 15, 20, 25].map((day) => {
@@ -220,7 +220,7 @@ export default function OnboardingScreen() {
           ) : null}
 
           <ActionButton
-            label={saving ? 'Setting up…' : 'Set up my space'}
+            label={saving ? 'Setting Up…' : 'Set Up My Space'}
             onPress={() => {
               void submit();
             }}

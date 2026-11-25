@@ -1,0 +1,390 @@
+{
+  "app": "PocketPal",
+  "version": 1,
+  "schemaVersion": 1,
+  "exportedAt": "2026-11-24T18:45:16.012Z",
+  "preferences": {
+    "name": "Aarav",
+    "currency": "INR",
+    "allowanceMinor": 1000000,
+    "cycleStartDay": 1,
+    "themeMode": "system",
+    "pacingMode": "adaptive",
+    "onboarded": 1
+  },
+  "expenses": [
+    {
+      "id": 101,
+      "amountMinor": 18000,
+      "title": "PG breakfast and filter coffee",
+      "category": "Food",
+      "occurredAt": "2026-11-05T02:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 102,
+      "amountMinor": 8500,
+      "title": "Metro card top-up",
+      "category": "Transport",
+      "occurredAt": "2026-11-05T12:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 103,
+      "amountMinor": 24000,
+      "title": "College canteen lunch",
+      "category": "Food",
+      "occurredAt": "2026-11-06T07:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 104,
+      "amountMinor": 80000,
+      "title": "Bluetooth earbuds",
+      "category": "Shopping",
+      "occurredAt": "2026-11-07T05:30:00.000Z",
+      "reflection": "Just wanted it",
+      "note": "Convenience purchase"
+    },
+    {
+      "id": 105,
+      "amountMinor": 65000,
+      "title": "Cinema ticket and popcorn",
+      "category": "Social",
+      "occurredAt": "2026-11-08T14:30:00.000Z",
+      "reflection": "Spontaneous",
+      "note": null
+    },
+    {
+      "id": 106,
+      "amountMinor": 9500,
+      "title": "Tea and poha",
+      "category": "Food",
+      "occurredAt": "2026-11-10T03:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 107,
+      "amountMinor": 5500,
+      "title": "Bus ticket home",
+      "category": "Transport",
+      "occurredAt": "2026-11-10T13:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 108,
+      "amountMinor": 85000,
+      "title": "USB-C hub for laptop",
+      "category": "Shopping",
+      "occurredAt": "2026-11-11T11:30:00.000Z",
+      "reflection": "Just wanted it",
+      "note": "Electronic accessory"
+    },
+    {
+      "id": 109,
+      "amountMinor": 32000,
+      "title": "Mess lunch with friends",
+      "category": "Food",
+      "occurredAt": "2026-11-12T06:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 110,
+      "amountMinor": 65000,
+      "title": "Fuel for borrowed scooter",
+      "category": "Transport",
+      "occurredAt": "2026-11-14T02:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 111,
+      "amountMinor": 9500,
+      "title": "Haircut",
+      "category": "Shopping",
+      "occurredAt": "2026-11-14T09:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 112,
+      "amountMinor": 42000,
+      "title": "Bowling arcade session",
+      "category": "Social",
+      "occurredAt": "2026-11-15T15:30:00.000Z",
+      "reflection": "Spontaneous",
+      "note": null
+    },
+    {
+      "id": 113,
+      "amountMinor": 35000,
+      "title": "Cafe catch-up",
+      "category": "Social",
+      "occurredAt": "2026-11-17T07:30:00.000Z",
+      "reflection": "Spontaneous",
+      "note": null
+    },
+    {
+      "id": 114,
+      "amountMinor": 80000,
+      "title": "Printer ink and notebook bundle",
+      "category": "Study",
+      "occurredAt": "2026-11-18T04:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 115,
+      "amountMinor": 18000,
+      "title": "Tiffin meal",
+      "category": "Food",
+      "occurredAt": "2026-11-19T06:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 116,
+      "amountMinor": 9000,
+      "title": "Auto ride",
+      "category": "Transport",
+      "occurredAt": "2026-11-19T12:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 117,
+      "amountMinor": 55000,
+      "title": "Weekend dinner with friends",
+      "category": "Social",
+      "occurredAt": "2026-11-21T14:30:00.000Z",
+      "reflection": "Spontaneous",
+      "note": null
+    },
+    {
+      "id": 118,
+      "amountMinor": 14000,
+      "title": "Breakfast at PG",
+      "category": "Food",
+      "occurredAt": "2026-11-22T02:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 119,
+      "amountMinor": 7000,
+      "title": "Bus fare",
+      "category": "Transport",
+      "occurredAt": "2026-11-22T12:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 120,
+      "amountMinor": 65000,
+      "title": "Casual shoes",
+      "category": "Shopping",
+      "occurredAt": "2026-11-23T10:30:00.000Z",
+      "reflection": "Spontaneous",
+      "note": null
+    },
+    {
+      "id": 121,
+      "amountMinor": 21000,
+      "title": "South Indian lunch",
+      "category": "Food",
+      "occurredAt": "2026-11-24T07:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 122,
+      "amountMinor": 26000,
+      "title": "Online subscription renewal",
+      "category": "Other",
+      "occurredAt": "2026-11-24T13:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 124,
+      "amountMinor": 4500,
+      "title": "Evening chai",
+      "category": "Food",
+      "occurredAt": "2026-11-06T12:30:00.000Z",
+      "reflection": "Spontaneous",
+      "note": null
+    },
+    {
+      "id": 125,
+      "amountMinor": 6500,
+      "title": "Bakery snack",
+      "category": "Food",
+      "occurredAt": "2026-11-12T12:30:00.000Z",
+      "reflection": "Spontaneous",
+      "note": null
+    },
+    {
+      "id": 126,
+      "amountMinor": 5000,
+      "title": "Ice cream with classmates",
+      "category": "Social",
+      "occurredAt": "2026-11-17T15:30:00.000Z",
+      "reflection": "Just wanted it",
+      "note": null
+    },
+    {
+      "id": 127,
+      "amountMinor": 7500,
+      "title": "Short auto ride",
+      "category": "Transport",
+      "occurredAt": "2026-11-24T02:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    }
+  ],
+  "incomes": [
+    {
+      "id": 201,
+      "amountMinor": 1000000,
+      "title": "Monthly family allowance",
+      "source": "Family transfer",
+      "occurredAt": "2026-11-05T03:30:00.000Z",
+      "note": null
+    },
+    {
+      "id": 202,
+      "amountMinor": 150000,
+      "title": "Family top-up",
+      "source": "Allowance",
+      "occurredAt": "2026-11-08T05:30:00.000Z",
+      "note": "One-time top-up"
+    },
+    {
+      "id": 203,
+      "amountMinor": 250000,
+      "title": "Weekend tutoring payment",
+      "source": "Part-time work",
+      "occurredAt": "2026-11-14T10:30:00.000Z",
+      "note": null
+    }
+  ],
+  "goals": [
+    {
+      "id": 301,
+      "name": "Emergency cushion",
+      "targetMinor": 500000,
+      "savedMinor": 200000,
+      "createdAt": "2026-11-05T03:30:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": 302,
+      "name": "Wireless headphones",
+      "targetMinor": 150000,
+      "savedMinor": 80000,
+      "createdAt": "2026-11-07T03:30:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": 303,
+      "name": "Old laptop fund",
+      "targetMinor": 100000,
+      "savedMinor": 0,
+      "createdAt": "2026-11-09T03:30:00.000Z",
+      "deletedAt": "2026-11-23T12:30:00.000Z"
+    }
+  ],
+  "budgets": {
+    "Food": 250000,
+    "Transport": 160000,
+    "Study": 180000,
+    "Social": 220000,
+    "Shopping": 260000,
+    "Other": 80000
+  },
+  "zeroSpendDays": [
+    "2026-11-09",
+    "2026-11-13",
+    "2026-11-16",
+    "2026-11-20",
+    "2026-11-25"
+  ],
+  "goalTransactions": [
+    {
+      "id": 401,
+      "goalId": 301,
+      "kind": "deposit",
+      "amountMinor": 100000,
+      "occurredAt": "2026-11-09T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Emergency cushion",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 402,
+      "goalId": 301,
+      "kind": "deposit",
+      "amountMinor": 150000,
+      "occurredAt": "2026-11-18T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Emergency cushion",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 403,
+      "goalId": 301,
+      "kind": "withdrawal",
+      "amountMinor": 50000,
+      "occurredAt": "2026-11-22T12:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Emergency cushion",
+      "operationType": "Withdrawal"
+    },
+    {
+      "id": 404,
+      "goalId": 302,
+      "kind": "deposit",
+      "amountMinor": 50000,
+      "occurredAt": "2026-11-11T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Wireless headphones",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 405,
+      "goalId": 302,
+      "kind": "deposit",
+      "amountMinor": 30000,
+      "occurredAt": "2026-11-20T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Wireless headphones",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 406,
+      "goalId": 303,
+      "kind": "deposit",
+      "amountMinor": 60000,
+      "occurredAt": "2026-11-10T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Old laptop fund",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 407,
+      "goalId": 303,
+      "kind": "withdrawal",
+      "amountMinor": 60000,
+      "occurredAt": "2026-11-23T11:30:00.000Z",
+      "note": "Withdrawn from deleted Old laptop fund",
+      "goalNameSnapshot": "Old laptop fund",
+      "operationType": "Deleted Goal Withdrawal"
+    }
+  ]
+}

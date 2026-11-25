@@ -337,6 +337,25 @@ export function goalLedgerSummary(goalTransactions = []) {
   };
 }
 
+export function goalLedgerSummaryForPeriod(goalTransactions = [], from, to) {
+  const startKey = localDateKey(from);
+  const endKey = localDateKey(to);
+  const inPeriod = (Array.isArray(goalTransactions) ? goalTransactions : []).filter((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    try {
+      const key = localDateKey(entry.occurredAt);
+      return key >= startKey && key <= endKey;
+    } catch {
+      return false;
+    }
+  });
+  const summary = goalLedgerSummary(inPeriod);
+  return {
+    ...summary,
+    additionsMinor: summary.depositsMinor,
+  };
+}
+
 export function applyGoalBalanceChange(balanceMinor, kind, amountMinor, targetMinor = Number.MAX_SAFE_INTEGER) {
   if (!Number.isSafeInteger(balanceMinor) || balanceMinor < 0) {
     throw new Error('The current goal balance is invalid.');
@@ -476,11 +495,27 @@ export function buildActivityRecords({
 
   for (const transaction of Array.isArray(goalTransactions) ? goalTransactions : []) {
     const goalId = Number(getValueOrDefault(transaction.goalId, transaction.goal_id));
-    const goalName = goalNames.get(goalId);
-    const isClosure =
-      transaction.kind === 'withdrawal' &&
-      typeof transaction.note === 'string' &&
-      transaction.note.startsWith('Goal closed:');
+    const goalName =
+      transaction.goalNameSnapshot ||
+      transaction.goal_name_snapshot ||
+      goalNames.get(goalId) ||
+      null;
+    const operationType =
+      transaction.operationType ||
+      transaction.operation_type ||
+      (transaction.kind === 'withdrawal'
+        ? (typeof transaction.note === 'string' &&
+          (transaction.note.startsWith('Withdrawn from deleted ') || transaction.note.startsWith('Goal closed:'))
+          ? 'Deleted Goal Withdrawal'
+          : 'Withdrawal')
+        : 'Added Savings');
+    const isClosure = operationType === 'Deleted Goal Withdrawal';
+    const title =
+      isClosure
+        ? `Withdrawn from deleted ${goalName || 'goal'}`
+        : operationType === 'Withdrawal'
+        ? `Withdrawal — ${goalName || 'Savings goal'}`
+        : `Added Savings — ${goalName || 'Savings goal'}`;
     records.push({
       key: `goal-transaction:${transaction.id}`,
       recordId: transaction.id,
@@ -489,7 +524,7 @@ export function buildActivityRecords({
         : transaction.kind === 'withdrawal'
         ? 'savingsWithdrawal'
         : 'savingsAllocation',
-      title: isClosure ? 'Goal closure · returned savings' : transaction.kind === 'withdrawal' ? 'Savings withdrawal' : 'Savings allocation',
+      title,
       amountMinor: transaction.amountMinor,
       occurredAt: transaction.occurredAt,
       goalId,
@@ -1111,7 +1146,9 @@ export function validateBackupPayload(data) {
         transaction.amountMinor <= 0 ||
         typeof transaction.occurredAt !== 'string' ||
         Number.isNaN(Date.parse(transaction.occurredAt)) ||
-        (transaction.note !== undefined && transaction.note !== null && typeof transaction.note !== 'string')
+        (transaction.note !== undefined && transaction.note !== null && typeof transaction.note !== 'string') ||
+        (transaction.goalNameSnapshot !== undefined && transaction.goalNameSnapshot !== null && typeof transaction.goalNameSnapshot !== 'string') ||
+        (transaction.operationType !== undefined && transaction.operationType !== null && !['Added Savings', 'Withdrawal', 'Deleted Goal Withdrawal'].includes(transaction.operationType))
       ) {
         throw new Error('Invalid PocketPal backup file.');
       }

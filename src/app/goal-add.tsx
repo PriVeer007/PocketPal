@@ -18,11 +18,11 @@ export default function AddToGoalScreen() {
 
   if (!goal) {
     return (
-      <Screen title="Goal not found" hasBottomNav={false}>
+      <Screen title="Goal Not Found" hasBottomNav={false}>
         <AppText variant="body" color={p.textSecondary}>
           This savings goal may have been removed.
         </AppText>
-        <ActionButton label="Back to goals" onPress={() => router.back()} />
+        <ActionButton label="Back To Goals" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -61,12 +61,12 @@ export default function AddToGoalScreen() {
   return (
     <Screen
       hasBottomNav={false}
-      title="Add to goal"
+      title="Add To Goal"
       action={
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Cancel adding savings"
+          accessibilityLabel="Cancel Adding Savings"
           hitSlop={8}
           style={ui.textAction}
         >
@@ -81,13 +81,13 @@ export default function AddToGoalScreen() {
           {goal.name}
         </AppText>
         <AppText variant="caption" color={p.textSecondary} tabular>
-          Currently saved: {formatMoney(savedMinor, preferences.currency)} of{' '}
+          Currently Saved: {formatMoney(savedMinor, preferences.currency)} of{' '}
           {formatMoney(goal.targetMinor, preferences.currency)}
         </AppText>
       </View>
 
       <Surface style={{ gap: 12 }}>
-        <AppText variant="captionMedium">Amount to add ({preferences.currency})</AppText>
+        <AppText variant="captionMedium">Amount To Add ({preferences.currency})</AppText>
         <TextInput
           value={amount}
           onChangeText={(value) => {
@@ -98,11 +98,11 @@ export default function AddToGoalScreen() {
           placeholder="0"
           placeholderTextColor={p.textSecondary}
           style={[styles.amountInput, { color: p.text, borderBottomColor: p.border }]}
-          accessibilityLabel="Savings contribution amount"
+          accessibilityLabel="Savings Contribution Amount"
         />
         <AppText variant="caption" color={p.textSecondary} tabular>
           {remainingToGoal > 0
-            ? `${formatMoney(remainingToGoal, preferences.currency)} left to reach your target`
+            ? `${formatMoney(remainingToGoal, preferences.currency)} Left To Reach Your Target`
             : 'This goal has already reached its full target.'}
         </AppText>
       </Surface>
@@ -114,7 +114,7 @@ export default function AddToGoalScreen() {
       ) : null}
 
       <ActionButton
-        label={saving ? 'Updating…' : 'Record contribution'}
+        label={saving ? 'Updating…' : 'Record Contribution'}
         onPress={() => {
           void submit();
         }}

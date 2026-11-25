@@ -41,12 +41,12 @@ export default function CreateGoalScreen() {
   return (
     <Screen
       hasBottomNav={false}
-      title="New savings goal"
+      title="New Savings Goal"
       action={
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Cancel goal creation"
+          accessibilityLabel="Cancel Goal Creation"
           hitSlop={8}
           style={ui.textAction}
         >
@@ -61,7 +61,7 @@ export default function CreateGoalScreen() {
       </AppText>
 
       <View style={{ gap: 8 }}>
-        <AppText variant="captionMedium">What are you saving for?</AppText>
+        <AppText variant="captionMedium">What Are You Saving For?</AppText>
         <TextInput
           value={name}
           onChangeText={(v) => {
@@ -83,7 +83,7 @@ export default function CreateGoalScreen() {
       </View>
 
       <Surface style={{ gap: 12 }}>
-        <AppText variant="captionMedium">Target amount ({preferences.currency})</AppText>
+        <AppText variant="captionMedium">Target Amount ({preferences.currency})</AppText>
         <TextInput
           value={amount}
           onChangeText={(value) => {
@@ -94,7 +94,7 @@ export default function CreateGoalScreen() {
           placeholder="0"
           placeholderTextColor={p.textSecondary}
           style={[styles.amountInput, { color: p.text, borderBottomColor: p.border }]}
-          accessibilityLabel="Target savings amount"
+          accessibilityLabel="Target Savings Amount"
         />
         <AppText variant="caption" color={p.textSecondary}>
           There is no deadline or required schedule. You contribute whenever you have room.
@@ -108,7 +108,7 @@ export default function CreateGoalScreen() {
       ) : null}
 
       <ActionButton
-        label={saving ? 'Saving…' : 'Create goal'}
+        label={saving ? 'Saving…' : 'Create Goal'}
         onPress={() => {
           void submit();
         }}

@@ -1,0 +1,365 @@
+{
+  "app": "PocketPal",
+  "version": 1,
+  "schemaVersion": 1,
+  "exportedAt": "2026-11-24T18:45:16.061Z",
+  "preferences": {
+    "name": "Ananya",
+    "currency": "INR",
+    "allowanceMinor": 1200000,
+    "cycleStartDay": 1,
+    "themeMode": "light",
+    "pacingMode": "adaptive",
+    "onboarded": 1
+  },
+  "expenses": [
+    {
+      "id": 501,
+      "amountMinor": 21000,
+      "title": "Breakfast and coffee",
+      "category": "Food",
+      "occurredAt": "2026-11-05T02:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 502,
+      "amountMinor": 6000,
+      "title": "Metro recharge",
+      "category": "Transport",
+      "occurredAt": "2026-11-05T12:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 503,
+      "amountMinor": 26000,
+      "title": "Vegetarian mess lunch",
+      "category": "Food",
+      "occurredAt": "2026-11-06T07:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 504,
+      "amountMinor": 45000,
+      "title": "Library stationery refill",
+      "category": "Study",
+      "occurredAt": "2026-11-08T11:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 505,
+      "amountMinor": 18000,
+      "title": "Fruit bowl",
+      "category": "Food",
+      "occurredAt": "2026-11-09T06:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 506,
+      "amountMinor": 32000,
+      "title": "Bus pass top-up",
+      "category": "Transport",
+      "occurredAt": "2026-11-10T13:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 507,
+      "amountMinor": 15000,
+      "title": "Menstrual hygiene essentials",
+      "category": "Shopping",
+      "occurredAt": "2026-11-11T02:30:00.000Z",
+      "reflection": "Needed",
+      "note": "Personal-care necessity"
+    },
+    {
+      "id": 508,
+      "amountMinor": 28000,
+      "title": "PG cafeteria meal",
+      "category": "Food",
+      "occurredAt": "2026-11-13T06:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 509,
+      "amountMinor": 39000,
+      "title": "Course workbook",
+      "category": "Study",
+      "occurredAt": "2026-11-14T10:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 510,
+      "amountMinor": 48000,
+      "title": "Friends dinner",
+      "category": "Social",
+      "occurredAt": "2026-11-15T14:30:00.000Z",
+      "reflection": "Just wanted it",
+      "note": null
+    },
+    {
+      "id": 511,
+      "amountMinor": 22000,
+      "title": "Hygiene and grooming kit",
+      "category": "Shopping",
+      "occurredAt": "2026-11-17T04:30:00.000Z",
+      "reflection": "Needed",
+      "note": "Personal care"
+    },
+    {
+      "id": 512,
+      "amountMinor": 27500,
+      "title": "Lunch near campus",
+      "category": "Food",
+      "occurredAt": "2026-11-18T06:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 513,
+      "amountMinor": 14000,
+      "title": "Metro fare",
+      "category": "Transport",
+      "occurredAt": "2026-11-18T12:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 514,
+      "amountMinor": 50000,
+      "title": "Closed-footwear sale",
+      "category": "Shopping",
+      "occurredAt": "2026-11-19T10:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 515,
+      "amountMinor": 35000,
+      "title": "Movie with classmates",
+      "category": "Social",
+      "occurredAt": "2026-11-20T13:30:00.000Z",
+      "reflection": "Spontaneous",
+      "note": null
+    },
+    {
+      "id": 516,
+      "amountMinor": 19000,
+      "title": "Breakfast",
+      "category": "Food",
+      "occurredAt": "2026-11-22T03:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 517,
+      "amountMinor": 30000,
+      "title": "Lab printing and graph sheets",
+      "category": "Study",
+      "occurredAt": "2026-11-22T08:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 518,
+      "amountMinor": 24000,
+      "title": "Grocery restock",
+      "category": "Food",
+      "occurredAt": "2026-11-23T05:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    },
+    {
+      "id": 519,
+      "amountMinor": 16000,
+      "title": "Auto ride",
+      "category": "Transport",
+      "occurredAt": "2026-11-23T11:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 520,
+      "amountMinor": 21000,
+      "title": "Cafe study session",
+      "category": "Social",
+      "occurredAt": "2026-11-24T07:30:00.000Z",
+      "reflection": "Needed",
+      "note": null
+    },
+    {
+      "id": 521,
+      "amountMinor": 60000,
+      "title": "Budget mobile charger and power bank",
+      "category": "Shopping",
+      "occurredAt": "2026-11-24T12:30:00.000Z",
+      "reflection": "Planned",
+      "note": null
+    }
+  ],
+  "incomes": [
+    {
+      "id": 601,
+      "amountMinor": 1200000,
+      "title": "Monthly family allowance",
+      "source": "Family transfer",
+      "occurredAt": "2026-11-05T03:30:00.000Z",
+      "note": null
+    },
+    {
+      "id": 602,
+      "amountMinor": 100000,
+      "title": "Family extra for cycle",
+      "source": "Allowance",
+      "occurredAt": "2026-11-10T10:30:00.000Z",
+      "note": "One-time top-up"
+    },
+    {
+      "id": 603,
+      "amountMinor": 180000,
+      "title": "Graphic design project",
+      "source": "Freelance",
+      "occurredAt": "2026-11-17T06:30:00.000Z",
+      "note": null
+    }
+  ],
+  "goals": [
+    {
+      "id": 701,
+      "name": "Emergency fund",
+      "targetMinor": 400000,
+      "savedMinor": 180000,
+      "createdAt": "2026-11-05T03:30:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": 702,
+      "name": "College trip",
+      "targetMinor": 200000,
+      "savedMinor": 90000,
+      "createdAt": "2026-11-08T03:30:00.000Z",
+      "deletedAt": null
+    },
+    {
+      "id": 703,
+      "name": "Laptop upgrade",
+      "targetMinor": 600000,
+      "savedMinor": 150000,
+      "createdAt": "2026-11-12T03:30:00.000Z",
+      "deletedAt": null
+    }
+  ],
+  "budgets": {
+    "Food": 280000,
+    "Transport": 180000,
+    "Study": 220000,
+    "Social": 120000,
+    "Shopping": 220000,
+    "Other": 80000
+  },
+  "zeroSpendDays": [
+    "2026-11-07",
+    "2026-11-12",
+    "2026-11-16",
+    "2026-11-21",
+    "2026-11-25"
+  ],
+  "goalTransactions": [
+    {
+      "id": 801,
+      "goalId": 701,
+      "kind": "deposit",
+      "amountMinor": 60000,
+      "occurredAt": "2026-11-06T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Emergency fund",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 802,
+      "goalId": 701,
+      "kind": "deposit",
+      "amountMinor": 50000,
+      "occurredAt": "2026-11-13T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Emergency fund",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 803,
+      "goalId": 701,
+      "kind": "deposit",
+      "amountMinor": 70000,
+      "occurredAt": "2026-11-21T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Emergency fund",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 804,
+      "goalId": 702,
+      "kind": "deposit",
+      "amountMinor": 40000,
+      "occurredAt": "2026-11-09T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "College trip",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 805,
+      "goalId": 702,
+      "kind": "deposit",
+      "amountMinor": 40000,
+      "occurredAt": "2026-11-16T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "College trip",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 806,
+      "goalId": 702,
+      "kind": "deposit",
+      "amountMinor": 40000,
+      "occurredAt": "2026-11-22T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "College trip",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 807,
+      "goalId": 702,
+      "kind": "withdrawal",
+      "amountMinor": 30000,
+      "occurredAt": "2026-11-24T11:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "College trip",
+      "operationType": "Withdrawal"
+    },
+    {
+      "id": 808,
+      "goalId": 703,
+      "kind": "deposit",
+      "amountMinor": 50000,
+      "occurredAt": "2026-11-15T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Laptop upgrade",
+      "operationType": "Added Savings"
+    },
+    {
+      "id": 809,
+      "goalId": 703,
+      "kind": "deposit",
+      "amountMinor": 100000,
+      "occurredAt": "2026-11-23T04:30:00.000Z",
+      "note": null,
+      "goalNameSnapshot": "Laptop upgrade",
+      "operationType": "Added Savings"
+    }
+  ]
+}

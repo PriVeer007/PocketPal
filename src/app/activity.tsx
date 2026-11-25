@@ -40,7 +40,7 @@ export default function ActivityScreen() {
   const onAccent = useAccentForeground();
   const { preferences, expenses, incomes, goalRecords, goalTransactions, removeExpense } = useFinance();
   const [filter, setFilter] = useState<Category | 'All'>('All');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income' | 'savings'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income' | 'savings' | 'savingsAdditions' | 'savingsWithdrawals'>('all');
   const [query, setQuery] = useState('');
 
   const records = useMemo(
@@ -55,7 +55,9 @@ export default function ActivityScreen() {
       const matchType =
         typeFilter === 'all' ||
         item.type === typeFilter ||
-        (typeFilter === 'savings' && isSavings);
+        (typeFilter === 'savings' && isSavings) ||
+        (typeFilter === 'savingsAdditions' && item.type === 'savingsAllocation') ||
+        (typeFilter === 'savingsWithdrawals' && (item.type === 'savingsWithdrawal' || item.type === 'goalClosure'));
       const matchCat = filter === 'All' || (item.type === 'expense' && item.category === filter);
       const matchQuery =
         !q ||
@@ -84,10 +86,10 @@ export default function ActivityScreen() {
 
   const confirmDelete = (item: Expense) => {
     Alert.alert(
-      'Remove this spend?',
+      'Remove This Spend?',
       `“${item.title}” (${formatMoney(item.amountMinor, preferences.currency)}) will be permanently deleted from this device.`,
       [
-        { text: 'Keep it', style: 'cancel' },
+        { text: 'Keep It', style: 'cancel' },
         {
           text: 'Remove',
           style: 'destructive',
@@ -101,7 +103,7 @@ export default function ActivityScreen() {
 
   return (
     <AppScaffold>
-      <Screen eyebrow="Your records" title="Activity">
+      <Screen eyebrow="Your Records" title="Activity">
         {/* Search Bar */}
         <View style={[ui.row, { gap: Spacing.eight }]}>
           <View
@@ -121,10 +123,10 @@ export default function ActivityScreen() {
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search all activity…"
+              placeholder="Search All Activity…"
               placeholderTextColor={p.textSecondary}
               style={[styles.searchInput, { color: p.text }]}
-              accessibilityLabel="Search all activity"
+              accessibilityLabel="Search All Activity"
             />
           </View>
           {query || filter !== 'All' || typeFilter !== 'all' ? (
@@ -135,7 +137,7 @@ export default function ActivityScreen() {
                 setTypeFilter('all');
               }}
               accessibilityRole="button"
-              accessibilityLabel="Clear search and category filter"
+              accessibilityLabel="Clear Search And Category Filter"
               hitSlop={8}
               style={ui.textAction}
             >
@@ -148,10 +150,12 @@ export default function ActivityScreen() {
 
         <View style={ui.wrapRow}>
           {([
-            { id: 'all' as const, label: 'All activity' },
+            { id: 'all' as const, label: 'All Activity' },
             { id: 'expense' as const, label: 'Expenses' },
             { id: 'income' as const, label: 'Income' },
             { id: 'savings' as const, label: 'Savings' },
+            { id: 'savingsAdditions' as const, label: 'Added Savings' },
+            { id: 'savingsWithdrawals' as const, label: 'Withdrawals' },
           ] as const).map((option) => {
             const active = typeFilter === option.id;
             return (
@@ -203,10 +207,10 @@ export default function ActivityScreen() {
         {/* Results Count & Summary */}
         <View style={[ui.row, { justifyContent: 'space-between' }]}>
           <AppText variant="caption" color={p.textSecondary}>
-            {filtered.length} {filtered.length === 1 ? 'record' : 'records'} found
+            {filtered.length} {filtered.length === 1 ? 'Record' : 'Records'} Found
           </AppText>
           <AppText variant="caption" color={p.textSecondary}>
-            Newest first
+            Newest First
           </AppText>
         </View>
 
@@ -233,12 +237,12 @@ export default function ActivityScreen() {
                     const typeLabel = isExpense
                       ? item.category ?? 'Expense'
                       : isIncome
-                      ? `Income${item.description ? ` · ${item.description}` : ''}`
+                      ? `Income${item.description ? ` · ${item.description === 'Part-time work' ? 'Part-Time Work' : item.description}` : ''}`
                       : isAllocation
-                      ? 'Savings allocation'
+                      ? `Added Savings${item.goalName ? ` — ${item.goalName}` : ''}`
                       : item.type === 'goalClosure'
-                      ? 'Goal closure · returned savings'
-                      : 'Savings withdrawal';
+                      ? item.note || 'Deleted Goal Withdrawal'
+                      : `Withdrawal${item.goalName ? ` — ${item.goalName}` : ''}`;
                     const prefix = isExpense || isAllocation ? '−' : '+';
                     const amountColor = isPositive ? p.accent : isAllocation ? p.warning : p.text;
                     const expense = isExpense ? expenses.find((entry) => entry.id === item.recordId) : undefined;
@@ -311,7 +315,7 @@ export default function ActivityScreen() {
           })
         ) : (
           <EmptyState
-            title={records.length ? 'No matching activity' : 'Your activity starts here'}
+            title={records.length ? 'No Matching Activity' : 'Your Activity Starts Here'}
             detail={
               records.length
                 ? 'Try adjusting your search terms or selecting another category filter.'

@@ -18,11 +18,11 @@ export default function WithdrawFromGoalScreen() {
 
   if (!goal) {
     return (
-      <Screen title="Goal not found" hasBottomNav={false}>
+      <Screen title="Goal Not Found" hasBottomNav={false}>
         <AppText variant="body" color={p.textSecondary}>
           This savings goal may have been removed.
         </AppText>
-        <ActionButton label="Back to goals" onPress={() => router.back()} />
+        <ActionButton label="Back To Goals" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -59,12 +59,12 @@ export default function WithdrawFromGoalScreen() {
   return (
     <Screen
       hasBottomNav={false}
-      title="Withdraw from goal"
+      title="Withdraw From Goal"
       action={
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Cancel goal withdrawal"
+          accessibilityLabel="Cancel Goal Withdrawal"
           hitSlop={8}
           style={ui.textAction}
         >
@@ -79,12 +79,12 @@ export default function WithdrawFromGoalScreen() {
           {goal.name}
         </AppText>
         <AppText variant="caption" color={p.textSecondary} tabular>
-          Currently saved: {formatMoney(savedMinor, preferences.currency)}
+          Currently Saved: {formatMoney(savedMinor, preferences.currency)}
         </AppText>
       </View>
 
       <Surface style={{ gap: 12 }}>
-        <AppText variant="captionMedium">Amount to withdraw ({preferences.currency})</AppText>
+        <AppText variant="captionMedium">Amount To Withdraw ({preferences.currency})</AppText>
         <TextInput
           value={amount}
           onChangeText={(value) => {
@@ -95,10 +95,10 @@ export default function WithdrawFromGoalScreen() {
           placeholder="0"
           placeholderTextColor={p.textSecondary}
           style={[styles.amountInput, { color: p.text, borderBottomColor: p.border }]}
-          accessibilityLabel="Goal withdrawal amount"
+          accessibilityLabel="Goal Withdrawal Amount"
         />
         <AppText variant="caption" color={p.textSecondary} tabular>
-          Available to withdraw: {formatMoney(savedMinor, preferences.currency)}
+          Available To Withdraw: {formatMoney(savedMinor, preferences.currency)}
         </AppText>
       </Surface>
 
@@ -109,7 +109,7 @@ export default function WithdrawFromGoalScreen() {
       ) : null}
 
       <ActionButton
-        label={saving ? 'Withdrawing…' : 'Record withdrawal'}
+        label={saving ? 'Withdrawing…' : 'Record Withdrawal'}
         onPress={() => {
           void submit();
         }}

@@ -59,6 +59,17 @@ export function goalLedgerSummary(goalTransactions?: Array<{ amountMinor?: numbe
   netMinor: number;
   transactionCount: number;
 };
+export function goalLedgerSummaryForPeriod(
+  goalTransactions?: Array<{ amountMinor?: number; kind?: 'deposit' | 'withdrawal'; occurredAt?: string }>,
+  from?: string | Date | number,
+  to?: string | Date | number
+): {
+  depositsMinor: number;
+  withdrawalsMinor: number;
+  netMinor: number;
+  transactionCount: number;
+  additionsMinor: number;
+};
 export function applyGoalBalanceChange(
   balanceMinor: number,
   kind: 'deposit' | 'withdrawal',
@@ -84,7 +95,7 @@ export function buildActivityRecords(params?: {
   expenses?: Array<{ id: number; title: string; amountMinor: number; occurredAt: string; category: string; reflection: string | null; note: string | null }>;
   incomes?: Array<{ id: number; title: string; amountMinor: number; occurredAt: string; source: string; note: string | null }>;
   goals?: Array<{ id: number; name: string }>;
-  goalTransactions?: Array<{ id: number; goalId?: number; goal_id?: number; kind: 'deposit' | 'withdrawal'; amountMinor: number; occurredAt: string; note: string | null }>;
+  goalTransactions?: Array<{ id: number; goalId?: number; goal_id?: number; kind: 'deposit' | 'withdrawal'; amountMinor: number; occurredAt: string; note: string | null; goalNameSnapshot?: string | null; goal_name_snapshot?: string | null; operationType?: 'Added Savings' | 'Withdrawal' | 'Deleted Goal Withdrawal' | null; operation_type?: 'Added Savings' | 'Withdrawal' | 'Deleted Goal Withdrawal' | null }>;
 }): ActivityRecord[];
 export function categoryColor(category: string): string;
 export type SpendingProfileStatus = 'no-data' | 'insufficient-data' | 'ready' | 'error';

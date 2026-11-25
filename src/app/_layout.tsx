@@ -75,13 +75,13 @@ function RootNavigator() {
 
   if (error) {
     return (
-      <Screen title="Your data needs a moment" hasBottomNav={false}>
+      <Screen title="Your Data Needs A Moment" hasBottomNav={false}>
         <Surface style={{ gap: Spacing.twelve }}>
           <AppText size={14} color={palette.textSecondary}>
             {error}
           </AppText>
           <ActionButton
-            label="Try again"
+            label="Try Again"
             onPress={() => {
               void retry().catch(() => undefined);
             }}
