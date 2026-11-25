@@ -4,7 +4,7 @@
 
 PocketPal helps students make their allowance and personal spending easier to understand. Record expenses and income, set an allowance cycle, reflect on spending choices, review trends, and track savings goals—all in one offline-first mobile app.
 
-## The problem
+## The Problem
 
 Students often need to manage limited or irregular funds while balancing food, transport, study costs, social plans, and savings. Without a simple record of everyday transactions, it is easy to lose track of spending, overlook recurring habits, or postpone savings.
 
