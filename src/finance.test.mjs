@@ -5,9 +5,11 @@ import {
   applyGoalBalanceChange,
   buildActivityRecords,
   calculateBudgetSummary,
+  calculateNoCycleSummary,
   calculateDailyPace,
   calculateLoggingStreak,
   calculateSpendingProfile,
+  calendarWeeklySpendTrend,
   categoryBreakdown,
   categoryColor,
   currencyDigits,
@@ -16,6 +18,7 @@ import {
   formatMoney,
   generateBackupJSON,
   generateExpensesCSV,
+  isNoCycleBudgetActive,
   goalLedgerSummary,
   goalLedgerSummaryForPeriod,
   localDateKey,
@@ -25,6 +28,8 @@ import {
   reconcileGoalBalances,
   remainingAllowance,
   sumExpenses,
+  sumIncome,
+  normalizeTransactionDescription,
   toMinorUnits,
   validateBackupPayload,
   validateExpense,
@@ -49,6 +54,26 @@ test('respects currencies with zero, two, and three fractional digits', () => {
   assert.equal(currencyDigits('BHD'), 3);
   assert.equal(toMinorUnits(100, 'JPY'), 100);
   assert.equal(toMinorUnits(1.234, 'BHD'), 1234);
+});
+
+test('normalizes missing descriptions with transaction-specific defaults', () => {
+  for (const missing of [undefined, null, '', ' \t\r\n ']) {
+    assert.equal(normalizeTransactionDescription(missing, 'Unspecified Expense'), 'Unspecified Expense');
+    assert.equal(normalizeTransactionDescription(missing, 'Unspecified Income'), 'Unspecified Income');
+  }
+  assert.equal(normalizeTransactionDescription('Coffee', 'Unspecified Expense'), 'Coffee');
+  assert.equal(normalizeTransactionDescription(' Scholarship payment ', 'Unspecified Income'), 'Scholarship payment');
+});
+
+test('scheduled Monthly Cycle stays in No Fixed Cycle until its effective instant', () => {
+  const effectiveAt = new Date(2026, 11, 1).toISOString();
+  const preferences = { budgetingMode: 'monthly_cycle', monthlyEffectiveAt: effectiveAt };
+  assert.equal(isNoCycleBudgetActive(preferences, new Date(2026, 10, 30, 23, 59, 59)), true);
+  assert.equal(isNoCycleBudgetActive(preferences, new Date(2026, 11, 1)), false);
+  assert.equal(
+    isNoCycleBudgetActive({ budgetingMode: 'no_cycle', monthlyEffectiveAt: null }, new Date(2026, 11, 1)),
+    true
+  );
 });
 
 test('calculates allowance progress and remaining without exceeding bounds', () => {
@@ -282,6 +307,72 @@ test('deducts expenses and net savings once from the adjusted budget', () => {
   assert.equal(afterWithdrawal.incomeTopUpMinor, 2000);
 });
 
+test('calculates no-cycle balance from opening funds, all income, expenses, and savings ledger activity', () => {
+  const base = {
+    openingBalanceMinor: 200_000,
+    expensesThroughId: 10,
+    incomesThroughId: 20,
+    goalTransactionsThroughId: 30,
+    incomes: [
+      { id: 21, amountMinor: 100_000, source: 'Scholarship' },
+      { id: 22, amountMinor: 50_000, source: 'Freelance' },
+      { id: 23, amountMinor: 30_000, source: 'Other' },
+      { id: 20, amountMinor: 900_000, source: 'Allowance' },
+    ],
+    expenses: [
+      { id: 11, amountMinor: 80_000 },
+      { id: 10, amountMinor: 900_000 },
+    ],
+    goalTransactions: [
+      { id: 31, amountMinor: 50_000, kind: 'deposit' },
+      { id: 32, amountMinor: 20_000, kind: 'withdrawal' },
+      { id: 30, amountMinor: 900_000, kind: 'deposit' },
+    ],
+  };
+  const afterAllocation = calculateNoCycleSummary(base);
+  assert.deepEqual(afterAllocation, {
+    openingBalanceMinor: 200_000,
+    incomeMinor: 180_000,
+    expenseMinor: 80_000,
+    savingsAllocatedMinor: 50_000,
+    savingsWithdrawnMinor: 20_000,
+    availableMinor: 270_000,
+  });
+
+  const afterDuplicate = calculateNoCycleSummary({
+    ...base,
+    incomes: [...base.incomes, { ...base.incomes[0] }],
+    expenses: [...base.expenses, { ...base.expenses[0] }],
+    goalTransactions: [...base.goalTransactions, { ...base.goalTransactions[0] }],
+  });
+  assert.equal(afterDuplicate.availableMinor, 270_000);
+
+  const afterIncomeEdit = calculateNoCycleSummary({
+    ...base,
+    incomes: base.incomes.map((income) => income.id === 22 ? { ...income, amountMinor: 70_000 } : income),
+  });
+  assert.equal(afterIncomeEdit.availableMinor, 290_000);
+
+  const afterIncomeDeletion = calculateNoCycleSummary({
+    ...base,
+    incomes: base.incomes.filter((income) => income.id !== 23),
+  });
+  assert.equal(afterIncomeDeletion.availableMinor, 240_000);
+});
+
+test('keeps the available balance unchanged when a monthly balance becomes a no-cycle opening balance', () => {
+  const monthly = calculateBudgetSummary({
+    allowanceMinor: 120_000,
+    incomes: [{ id: 1, amountMinor: 20_000, source: 'Allowance', occurredAt: '2026-11-15T12:00:00.000Z' }],
+    cycleStartDate: new Date(2026, 10, 1),
+    cycleThroughDate: new Date(2026, 10, 28),
+    expenseMinor: 45_000,
+    savingsReservedMinor: 10_000,
+  });
+  const noCycle = calculateNoCycleSummary({ openingBalanceMinor: monthly.availableMinor });
+  assert.equal(noCycle.availableMinor, monthly.availableMinor);
+});
+
 test('uses adjusted budget for zero-spend progress and caps visual progress at 100 percent', () => {
   const cycleStartDate = new Date(2026, 10, 1);
   const cycleThroughDate = new Date(2026, 10, 30);
@@ -316,6 +407,29 @@ test('sums expense days in local calendar time, including the boundaries', () =>
     { amountMinor: 999, occurredAt: new Date(2026, 9, 30, 8, 10).toISOString() },
   ];
   assert.equal(sumExpenses(expenses, new Date(2026, 10, 3), new Date(2026, 10, 4)), 450);
+});
+
+test('sums income received in the selected reporting period regardless of source', () => {
+  const incomes = [
+    { amountMinor: 1000, source: 'Scholarship', occurredAt: new Date(2026, 10, 3, 10).toISOString() },
+    { amountMinor: 2000, source: 'Freelance', occurredAt: new Date(2026, 10, 5, 10).toISOString() },
+    { amountMinor: 3000, source: 'Other', occurredAt: new Date(2026, 10, 6, 10).toISOString() },
+  ];
+  assert.equal(sumIncome(incomes, new Date(2026, 10, 4), new Date(2026, 10, 6)), 5000);
+});
+
+test('groups no-cycle weekly spend by calendar weeks while retaining selected-date boundaries', () => {
+  const expenses = [
+    { amountMinor: 100, occurredAt: new Date(2026, 9, 31, 12).toISOString() },
+    { amountMinor: 200, occurredAt: new Date(2026, 10, 2, 12).toISOString() },
+    { amountMinor: 300, occurredAt: new Date(2026, 10, 8, 12).toISOString() },
+    { amountMinor: 400, occurredAt: new Date(2026, 10, 9, 12).toISOString() },
+    { amountMinor: 500, occurredAt: new Date(2026, 10, 11, 12).toISOString() },
+  ];
+  const trend = calendarWeeklySpendTrend(expenses, new Date(2026, 10, 1), new Date(2026, 10, 10));
+
+  assert.equal(trend.length, 3);
+  assert.deepEqual(trend.map((week) => week.amountMinor), [0, 500, 400]);
 });
 
 test('computes daily spend trends across a date window', () => {
@@ -428,10 +542,17 @@ test('summarizes savings ledger activity and includes it in backups', () => {
   assert.match(csv, /150\.00/);
 
   const zeroSpendDays = ['2026-11-09'];
-  const incomes = [{ id: 1, amountMinor: 25000, title: 'Freelance', source: 'Client', occurredAt: '2026-11-08T10:00:00.000Z', note: null }];
+  const incomes = [
+    { id: 1, amountMinor: 25000, title: 'Freelance', source: 'Client', occurredAt: '2026-11-08T10:00:00.000Z', note: null },
+    { id: 2, amountMinor: 1000, title: '', source: 'Scholarship', occurredAt: '2026-11-08T11:00:00.000Z', note: null },
+  ];
+  const backupExpenses = [
+    ...expenses,
+    { id: 2, occurredAt: '2026-11-10T12:00:00.000Z', title: ' \t ', category: 'Food', amountMinor: 100, reflection: null, note: null },
+  ];
   const goalTransactions = [{ id: 1, goalId: 42, kind: 'deposit', amountMinor: 25000, occurredAt: '2026-11-08T10:00:00.000Z', note: null }];
   const goals = [{ id: 42, name: 'Books', targetMinor: 50000, savedMinor: 25000, createdAt: '2026-11-01T10:00:00.000Z', deletedAt: null }];
-  const json = generateBackupJSON({ name: 'Alex' }, expenses, goals, {}, zeroSpendDays, incomes, goalTransactions);
+  const json = generateBackupJSON({ name: 'Alex' }, backupExpenses, goals, {}, zeroSpendDays, incomes, goalTransactions);
   assert.match(json, /PocketPal/);
   assert.match(json, /"name": "Alex"/);
   assert.match(json, /"zeroSpendDays": \[\s*"2026-11-09"/s);
@@ -439,6 +560,10 @@ test('summarizes savings ledger activity and includes it in backups', () => {
   assert.match(json, /"goalTransactions": \[/);
 
   const parsed = JSON.parse(json);
+  assert.equal(parsed.expenses[0].title, 'Lunch "Special"');
+  assert.equal(parsed.expenses[1].title, 'Unspecified Expense');
+  assert.equal(parsed.incomes[0].title, 'Freelance');
+  assert.equal(parsed.incomes[1].title, 'Unspecified Income');
   const validated = validateBackupPayload(parsed);
   assert.equal(validated.goalTransactionCount, 1);
   assert.doesNotThrow(() => validateBackupPayload(parsed));
@@ -525,6 +650,22 @@ test('builds one shared activity history for expenses, income, savings, and goal
   assert.equal(records.find((record) => record.type === 'savingsAllocation').goalName, 'Books');
   assert.equal(records.find((record) => record.type === 'goalClosure').type, 'goalClosure');
   assert.equal(dailySpendTrend([{ amountMinor: 2000, occurredAt: '2026-11-03T12:00:00.000Z' }], '2026-11-03', '2026-11-03')[0].amountMinor, 2000);
+});
+
+test('activity records provide type-specific fallbacks for legacy empty descriptions', () => {
+  const records = buildActivityRecords({
+    expenses: [
+      { id: 1, title: ' \t ', amountMinor: 2000, occurredAt: '2026-11-03T12:00:00.000Z', category: 'Food', reflection: null, note: null },
+    ],
+    incomes: [
+      { id: 2, title: null, amountMinor: 5000, occurredAt: '2026-11-03T13:00:00.000Z', source: 'Scholarship', note: null },
+    ],
+  });
+
+  assert.equal(records.length, 2);
+  assert.equal(records.find((record) => record.type === 'expense').title, 'Unspecified Expense');
+  assert.equal(records.find((record) => record.type === 'income').title, 'Unspecified Income');
+  assert.equal(records.find((record) => record.type === 'income').description, 'Scholarship');
 });
 
 test('spending profiles return no-data and insufficient-data states without fabrication', () => {
@@ -743,11 +884,14 @@ test('calculates adaptive rollover vs fixed daily pacing', () => {
   assert.equal(summary.dailyRoomMinor, 63750);
 });
 
-test('validates quick expense fields and keeps reflection optional', () => {
+test('validates required expense fields while allowing an empty description', () => {
   const entry = { amount: 42.5, title: 'Lunch', category: 'Food', currency: 'INR' };
   assert.deepEqual(validateExpense(entry), {});
   assert.ok(validateExpense({ ...entry, amount: 0 }).amount);
-  assert.ok(validateExpense({ ...entry, title: ' ' }).title);
+  assert.deepEqual(validateExpense({ ...entry, title: '' }), {});
+  assert.deepEqual(validateExpense({ ...entry, title: ' ' }), {});
+  assert.ok(validateExpense({ ...entry, category: '' }).category);
+  assert.ok(validateExpense({ ...entry, amount: undefined }).amount);
 });
 
 test('computes weekly and monthly spend trends', () => {

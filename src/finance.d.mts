@@ -4,6 +4,11 @@ export function formatMoney(minor: number, currency?: string): string;
 export function localDateKey(value: string | Date | number): string;
 export function cycleStart(value: string | Date | number, cycleStartDay?: number): Date;
 export function nextCycleStart(value: string | Date | number, cycleStartDay?: number): Date;
+export function isNoCycleBudgetActive(
+  preferences: { budgetingMode: 'monthly_cycle' | 'no_cycle'; monthlyEffectiveAt?: string | null },
+  now?: Date
+): boolean;
+export function normalizeTransactionDescription(value: string | null | undefined, fallback: string): string;
 export function remainingAllowance(allowanceMinor: number, spentMinor: number): number;
 export const CYCLE_BUDGET_TOP_UP_SOURCE: 'Allowance';
 export function calculateBudgetSummary(params: {
@@ -29,7 +34,24 @@ export function calculateBudgetSummary(params: {
   zeroSpendDays: number;
   mode: 'adaptive' | 'fixed';
 };
+export function calculateNoCycleSummary(params: {
+  openingBalanceMinor?: number;
+  expensesThroughId?: number;
+  incomesThroughId?: number;
+  goalTransactionsThroughId?: number;
+  expenses?: Array<{ id?: number; amountMinor: number }>;
+  incomes?: Array<{ id?: number; amountMinor: number; source?: string }>;
+  goalTransactions?: Array<{ id?: number; amountMinor: number; kind: 'deposit' | 'withdrawal' }>;
+}): {
+  openingBalanceMinor: number;
+  incomeMinor: number;
+  expenseMinor: number;
+  savingsAllocatedMinor: number;
+  savingsWithdrawnMinor: number;
+  availableMinor: number;
+};
 export function sumExpenses(expenses: Array<{ amountMinor: number; occurredAt: string }>, from: string | Date | number, to: string | Date | number): number;
+export function sumIncome(incomes: Array<{ amountMinor: number; occurredAt: string; source?: string }>, from: string | Date | number, to: string | Date | number): number;
 export function allowanceProgress(spentMinor: number, allowanceMinor: number): number;
 export function calculateDailyPace(params: {
   allowanceMinor: number;
@@ -44,6 +66,11 @@ export function dailySpendTrend(
   to: string | Date | number
 ): Array<{ dateKey: string; label: string; dayNumber: number; amountMinor: number }>;
 export function weeklySpendTrend(
+  expenses: Array<{ amountMinor: number; occurredAt: string }>,
+  from: string | Date | number,
+  to: string | Date | number
+): Array<{ dateKey: string; label: string; dayNumber: number; amountMinor: number }>;
+export function calendarWeeklySpendTrend(
   expenses: Array<{ amountMinor: number; occurredAt: string }>,
   from: string | Date | number,
   to: string | Date | number

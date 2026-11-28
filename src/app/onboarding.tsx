@@ -14,6 +14,7 @@ import { ActionButton, AppText, Surface, ui, useAccentForeground, usePalette } f
 import { Spacing } from '@/constants/theme';
 import { ScreenMotion } from '@/components/motion';
 import { toMinorUnits } from '@/finance.mjs';
+import type { BudgetingMode } from '@/store';
 import { useFinance } from '@/store';
 
 const currencies = [
@@ -25,6 +26,16 @@ const currencies = [
   ['AUD', 'A$'],
 ] as const;
 
+const cycleOptions: { day: number | null; label: string }[] = [
+  { day: 1, label: '1st' },
+  { day: 5, label: '5th' },
+  { day: 10, label: '10th' },
+  { day: 15, label: '15th' },
+  { day: 20, label: '20th' },
+  { day: 25, label: '25th' },
+  { day: null, label: 'None' },
+];
+
 export default function OnboardingScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
@@ -34,14 +45,24 @@ export default function OnboardingScreen() {
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('INR');
   const [cycle, setCycle] = useState(1);
+  const [budgetingMode, setBudgetingMode] = useState<BudgetingMode>('monthly_cycle');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    const parsed = Number(amount.replace(/,/g, ''));
-    const minor = toMinorUnits(parsed, currency);
-    if (!minor) {
+    const rawAmount = amount.trim();
+    const parsed = rawAmount ? Number(rawAmount.replace(/,/g, '')) : 0;
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError('Enter a valid amount.');
+      return;
+    }
+    if (budgetingMode === 'monthly_cycle' && parsed <= 0) {
       setError('Enter a monthly allowance amount greater than zero.');
+      return;
+    }
+    const minor = parsed === 0 ? 0 : toMinorUnits(parsed, currency);
+    if (minor === null) {
+      setError('Enter a valid amount.');
       return;
     }
 
@@ -50,8 +71,10 @@ export default function OnboardingScreen() {
       await savePreferences({
         name: name.trim().slice(0, 32),
         currency,
-        allowanceMinor: minor,
+        allowanceMinor: budgetingMode === 'monthly_cycle' ? minor : 0,
         cycleStartDay: cycle,
+        budgetingMode,
+        noCycleOpeningBalanceMinor: budgetingMode === 'no_cycle' ? minor : 0,
         onboarded: true,
       });
       router.replace('/');
@@ -121,7 +144,9 @@ export default function OnboardingScreen() {
             <View style={{ gap: 4 }}>
               <AppText variant="headline">Your Allowance Rhythm</AppText>
               <AppText variant="caption" color={p.textSecondary}>
-                Enter what you receive for one monthly cycle. You can adjust this anytime in settings.
+                {budgetingMode === 'no_cycle'
+                  ? "Don't receive money on a fixed schedule? Choose None. Your balance will update whenever you record income or expenses."
+                  : 'Enter what you receive for one monthly cycle. You can adjust this anytime in settings.'}
               </AppText>
             </View>
 
@@ -159,6 +184,10 @@ export default function OnboardingScreen() {
               </View>
             </View>
 
+            <AppText variant="caption" color={p.textSecondary}>
+              {budgetingMode === 'no_cycle' ? 'Optional Starting Balance' : 'Monthly Allowance'}
+            </AppText>
+
             {/* Amount Input */}
             <View style={[styles.amountRow, { borderBottomColor: p.border }]}>
               <AppText variant="title" color={p.textSecondary} size={26}>
@@ -174,22 +203,33 @@ export default function OnboardingScreen() {
                 placeholder="0"
                 placeholderTextColor={p.textSecondary}
                 style={[styles.amountInput, { color: p.text }]}
-                accessibilityLabel="Monthly Allowance Amount"
+                accessibilityLabel={budgetingMode === 'no_cycle' ? 'Optional Starting Balance' : 'Monthly Allowance Amount'}
               />
             </View>
 
             {/* Cycle Start Day */}
             <View style={{ gap: 8 }}>
               <AppText variant="caption" color={p.textSecondary}>
-                Cycle Reset Day Of The Month
+                Allowance Rhythm
               </AppText>
               <View style={styles.cycleRow}>
-                {[1, 5, 10, 15, 20, 25].map((day) => {
-                  const active = cycle === day;
+                {cycleOptions.map((option) => {
+                  const active =
+                    option.day === null
+                      ? budgetingMode === 'no_cycle'
+                      : budgetingMode === 'monthly_cycle' && cycle === option.day;
                   return (
                     <Pressable
-                      key={day}
-                      onPress={() => setCycle(day)}
+                      key={option.day ?? 'none'}
+                      onPress={() => {
+                        if (option.day === null) {
+                          setBudgetingMode('no_cycle');
+                        } else {
+                          setCycle(option.day);
+                          setBudgetingMode('monthly_cycle');
+                        }
+                        setError('');
+                      }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       style={[
@@ -203,8 +243,7 @@ export default function OnboardingScreen() {
                         variant="captionMedium"
                         color={active ? onAccent : p.text}
                       >
-                        {day}
-                        {day === 1 ? 'st' : 'th'}
+                        {option.label}
                       </AppText>
                     </Pressable>
                   );

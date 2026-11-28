@@ -136,6 +136,14 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="income-edit"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+            animationDuration: 220,
+          }}
+        />
+        <Stack.Screen
           name="goal-create"
           options={{
             presentation: 'modal',

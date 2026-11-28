@@ -67,6 +67,21 @@ export function nextCycleStart(value, cycleStartDay = 1) {
   return new Date(start.getFullYear(), start.getMonth() + 1, cycleStartDay, 0, 0, 0, 0);
 }
 
+export function isNoCycleBudgetActive(preferences, now = new Date()) {
+  return (
+    preferences.budgetingMode === 'no_cycle' ||
+    (preferences.monthlyEffectiveAt !== null &&
+      preferences.monthlyEffectiveAt !== undefined &&
+      Date.parse(preferences.monthlyEffectiveAt) > now.getTime())
+  );
+}
+
+export function normalizeTransactionDescription(value, fallback) {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim();
+  return normalized || fallback;
+}
+
 export function remainingAllowance(allowanceMinor, spentMinor) {
   return Math.max(0, Math.round(allowanceMinor) - Math.round(spentMinor));
 }
@@ -133,12 +148,71 @@ export function calculateBudgetSummary({
   };
 }
 
+function sumTransactionsAfterId(transactions, throughId, amountSelector) {
+  if (!Array.isArray(transactions)) return 0;
+  const seenIds = new Set();
+  return transactions.reduce((total, transaction) => {
+    if (!transaction) return total;
+    if (Number.isSafeInteger(transaction.id)) {
+      if (transaction.id <= throughId || seenIds.has(transaction.id)) return total;
+      seenIds.add(transaction.id);
+    }
+    return total + Math.max(0, Number(amountSelector(transaction)) || 0);
+  }, 0);
+}
+
+export function calculateNoCycleSummary({
+  openingBalanceMinor = 0,
+  expensesThroughId = 0,
+  incomesThroughId = 0,
+  goalTransactionsThroughId = 0,
+  expenses = [],
+  incomes = [],
+  goalTransactions = [],
+}) {
+  const safeOpeningBalance = Number.isSafeInteger(Number(openingBalanceMinor))
+    ? Number(openingBalanceMinor)
+    : 0;
+  const incomeMinor = sumTransactionsAfterId(incomes, incomesThroughId, (income) => income.amountMinor);
+  const expenseMinor = sumTransactionsAfterId(expenses, expensesThroughId, (expense) => expense.amountMinor);
+  const savingsAllocatedMinor = sumTransactionsAfterId(
+    goalTransactions,
+    goalTransactionsThroughId,
+    (transaction) => transaction.kind === 'deposit' ? transaction.amountMinor : 0
+  );
+  const savingsWithdrawnMinor = sumTransactionsAfterId(
+    goalTransactions,
+    goalTransactionsThroughId,
+    (transaction) => transaction.kind === 'withdrawal' ? transaction.amountMinor : 0
+  );
+  const availableMinor =
+    safeOpeningBalance + incomeMinor - expenseMinor - savingsAllocatedMinor + savingsWithdrawnMinor;
+
+  return {
+    openingBalanceMinor: safeOpeningBalance,
+    incomeMinor,
+    expenseMinor,
+    savingsAllocatedMinor,
+    savingsWithdrawnMinor,
+    availableMinor,
+  };
+}
+
 export function sumExpenses(expenses, from, to) {
   const start = localDateKey(from);
   const end = localDateKey(to);
   return expenses.reduce((total, expense) => {
     const date = localDateKey(expense.occurredAt);
     return total + (date >= start && date <= end ? expense.amountMinor : 0);
+  }, 0);
+}
+
+export function sumIncome(incomes, from, to) {
+  const start = localDateKey(from);
+  const end = localDateKey(to);
+  return incomes.reduce((total, income) => {
+    const date = localDateKey(income.occurredAt);
+    return total + (date >= start && date <= end ? income.amountMinor : 0);
   }, 0);
 }
 
@@ -259,6 +333,42 @@ export function weeklySpendTrend(expenses, from, to) {
     weekIndex += 1;
   }
 
+  return weeks;
+}
+
+export function calendarWeeklySpendTrend(expenses, from, to) {
+  const startDate = from instanceof Date ? new Date(from) : new Date(from);
+  const endDate = to instanceof Date ? new Date(to) : new Date(to);
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(23, 59, 59, 999);
+  const startKey = localDateKey(startDate);
+  const endKey = localDateKey(endDate);
+  const currentWeekStart = new Date(startDate);
+  currentWeekStart.setDate(currentWeekStart.getDate() - ((currentWeekStart.getDay() + 6) % 7));
+
+  const weeks = [];
+  let weekIndex = 1;
+  while (currentWeekStart <= endDate) {
+    const weekEnd = new Date(currentWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    const weekStartKey = localDateKey(currentWeekStart);
+    const weekEndKey = localDateKey(weekEnd);
+    const amountMinor = expenses.reduce((total, expense) => {
+      const dateKey = localDateKey(expense.occurredAt);
+      return dateKey >= startKey && dateKey <= endKey && dateKey >= weekStartKey && dateKey <= weekEndKey
+        ? total + expense.amountMinor
+        : total;
+    }, 0);
+    weeks.push({
+      dateKey: `${weekStartKey}_${weekEndKey}`,
+      label: currentWeekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      dayNumber: weekIndex,
+      amountMinor,
+    });
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    weekIndex += 1;
+  }
   return weeks;
 }
 
@@ -476,7 +586,7 @@ export function buildActivityRecords({
       key: `expense:${expense.id}`,
       recordId: expense.id,
       type: 'expense',
-      title: expense.title,
+      title: normalizeTransactionDescription(expense.title, 'Unspecified Expense'),
       amountMinor: expense.amountMinor,
       occurredAt: expense.occurredAt,
       category: expense.category,
@@ -490,7 +600,7 @@ export function buildActivityRecords({
       key: `income:${income.id}`,
       recordId: income.id,
       type: 'income',
-      title: income.title,
+      title: normalizeTransactionDescription(income.title, 'Unspecified Income'),
       amountMinor: income.amountMinor,
       occurredAt: income.occurredAt,
       description: income.source,
@@ -1062,6 +1172,14 @@ export function generateBackupJSON(
   incomes = [],
   goalTransactions = []
 ) {
+  const normalizedExpenses = expenses.map((expense) => ({
+    ...expense,
+    title: normalizeTransactionDescription(expense.title, 'Unspecified Expense'),
+  }));
+  const normalizedIncomes = incomes.map((income) => ({
+    ...income,
+    title: normalizeTransactionDescription(income.title, 'Unspecified Income'),
+  }));
   return JSON.stringify(
     {
       app: 'PocketPal',
@@ -1069,8 +1187,8 @@ export function generateBackupJSON(
       schemaVersion: 1,
       exportedAt: new Date().toISOString(),
       preferences,
-      expenses,
-      incomes,
+      expenses: normalizedExpenses,
+      incomes: normalizedIncomes,
       goals,
       budgets,
       zeroSpendDays,
@@ -1096,6 +1214,27 @@ export function validateBackupPayload(data) {
 
   if (data.preferences !== undefined && (typeof data.preferences !== 'object' || data.preferences === null)) {
     throw new Error('Invalid PocketPal backup file.');
+  }
+  if (data.preferences !== undefined) {
+    const { preferences } = data;
+    if (
+      (preferences.budgetingMode !== undefined &&
+        preferences.budgetingMode !== 'monthly_cycle' &&
+        preferences.budgetingMode !== 'no_cycle') ||
+      (preferences.noCycleOpeningBalanceMinor !== undefined &&
+        !Number.isSafeInteger(preferences.noCycleOpeningBalanceMinor)) ||
+      ['noCycleExpensesThroughId', 'noCycleIncomesThroughId', 'noCycleGoalTransactionsThroughId'].some(
+        (key) =>
+          preferences[key] !== undefined &&
+          (!Number.isSafeInteger(preferences[key]) || preferences[key] < 0)
+      ) ||
+      (preferences.monthlyEffectiveAt !== undefined &&
+        preferences.monthlyEffectiveAt !== null &&
+        (typeof preferences.monthlyEffectiveAt !== 'string' ||
+          Number.isNaN(Date.parse(preferences.monthlyEffectiveAt))))
+    ) {
+      throw new Error('Invalid PocketPal backup file.');
+    }
   }
   if (data.expenses !== undefined && !Array.isArray(data.expenses)) {
     throw new Error('Invalid PocketPal backup file.');
@@ -1199,9 +1338,6 @@ export function validateExpense(entry) {
     errors.amount = 'Enter an amount greater than zero.';
   } else if (entry.amount > 10000000) {
     errors.amount = 'Enter a realistic student amount.';
-  }
-  if (!entry.title || !entry.title.trim()) {
-    errors.title = 'Add a short description.';
   }
   if (!entry.category || !entry.category.trim()) {
     errors.category = 'Choose a category.';

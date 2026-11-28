@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import type { Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { SymbolViewProps } from 'expo-symbols';
 import React, { useMemo, useState } from 'react';
@@ -38,7 +39,7 @@ function formatDayHeader(isoString: string) {
 export default function ActivityScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
-  const { preferences, expenses, incomes, goalRecords, goalTransactions, removeExpense } = useFinance();
+  const { preferences, expenses, incomes, goalRecords, goalTransactions, removeExpense, removeIncome } = useFinance();
   const [filter, setFilter] = useState<Category | 'All'>('All');
   const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income' | 'savings' | 'savingsAdditions' | 'savingsWithdrawals'>('all');
   const [query, setQuery] = useState('');
@@ -95,6 +96,25 @@ export default function ActivityScreen() {
           style: 'destructive',
           onPress: () => {
             void removeExpense(item.id);
+          },
+        },
+      ]
+    );
+  };
+
+  const confirmIncomeDelete = (income: (typeof incomes)[number]) => {
+    Alert.alert(
+      'Delete Income?',
+      `“${income.title}” (${formatMoney(income.amountMinor, preferences.currency)}) will be permanently deleted from this device.`,
+      [
+        { text: 'Keep It', style: 'cancel' },
+        {
+          text: 'Delete Income',
+          style: 'destructive',
+          onPress: () => {
+            void removeIncome(income.id).catch(() => {
+              Alert.alert('Could Not Delete Income', 'Please try again.');
+            });
           },
         },
       ]
@@ -246,6 +266,7 @@ export default function ActivityScreen() {
                     const prefix = isExpense || isAllocation ? '−' : '+';
                     const amountColor = isPositive ? p.accent : isAllocation ? p.warning : p.text;
                     const expense = isExpense ? expenses.find((entry) => entry.id === item.recordId) : undefined;
+                    const income = isIncome ? incomes.find((entry) => entry.id === item.recordId) : undefined;
 
                     return (
                     <View key={item.key} style={{ paddingVertical: Spacing.eight, gap: Spacing.eight }}>
@@ -299,6 +320,27 @@ export default function ActivityScreen() {
                             hitSlop={8}
                           >
                             <AppText variant="caption" color={p.textSecondary}>Remove</AppText>
+                          </Pressable>
+                        </View>
+                      ) : null}
+
+                      {income ? (
+                        <View style={[ui.row, { justifyContent: 'flex-end', gap: Spacing.twelve, paddingTop: 2 }]}>
+                          <Pressable
+                            onPress={() => router.push((`/income-edit?id=${income.id}`) as Href)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Edit Income ${income.title}`}
+                            hitSlop={8}
+                          >
+                            <AppText variant="captionMedium" color={p.accent}>Edit Income</AppText>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => confirmIncomeDelete(income)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Delete Income ${income.title}`}
+                            hitSlop={8}
+                          >
+                            <AppText variant="caption" color={p.textSecondary}>Delete Income</AppText>
                           </Pressable>
                         </View>
                       ) : null}
