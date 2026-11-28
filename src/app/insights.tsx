@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import {
@@ -18,16 +18,19 @@ import {
 } from '@/components/app-ui';
 import {
   calculateSpendingProfile,
+  calendarWeeklySpendTrend,
   categoryBreakdown,
   categoryColor,
   cycleStart,
   dailySpendTrend,
   formatMoney,
   goalLedgerSummaryForPeriod,
+  isNoCycleBudgetActive,
   localDateKey,
   monthlySpendTrend,
   reconcileGoalBalances,
   sumExpenses,
+  sumIncome,
   weeklySpendTrend,
 } from '@/finance.mjs';
 import { useFinance } from '@/store';
@@ -41,14 +44,21 @@ type DistributionView = 'spending' | 'savings';
 export default function InsightsScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
-  const { ready, error, preferences, expenses, goals, goalTransactions } = useFinance();
+  const { ready, error, preferences, expenses, incomes, goals, goalTransactions } = useFinance();
 
   const [activeTab, setActiveTab] = useState<InsightTab>('overview');
   const [range, setRange] = useState<RangeOption>('cycle');
   const [granularity, setGranularity] = useState<Granularity>('daily');
   const [distributionView, setDistributionView] = useState<DistributionView>('spending');
 
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const nextDay = new Date();
+    nextDay.setHours(24, 0, 0, 0);
+    const timeout = setTimeout(() => setNow(new Date()), nextDay.getTime() - Date.now() + 1);
+    return () => clearTimeout(timeout);
+  }, [now]);
+  const isNoCycleView = isNoCycleBudgetActive(preferences, now);
 
   const { from, to, label } = useMemo(() => {
     if (range === '7d') {
@@ -63,11 +73,19 @@ export default function InsightsScreen() {
       start.setHours(0, 0, 0, 0);
       return { from: start, to: now, label: 'Past 30 Days' };
     }
+    if (isNoCycleView) {
+      return {
+        from: new Date(now.getFullYear(), now.getMonth(), 1),
+        to: now,
+        label: 'This Month',
+      };
+    }
     const cycle = cycleStart(now, preferences.cycleStartDay);
     return { from: cycle, to: now, label: 'Current Cycle' };
-  }, [now, preferences.cycleStartDay, range]);
+  }, [now, preferences.cycleStartDay, range, isNoCycleView]);
 
   const totalSpent = useMemo(() => sumExpenses(expenses, from, to), [expenses, from, to]);
+  const totalIncome = useMemo(() => sumIncome(incomes, from, to), [incomes, from, to]);
   const daysCount = useMemo(() => {
     return Math.max(1, Math.ceil((to.getTime() - from.getTime()) / 86400000));
   }, [from, to]);
@@ -76,13 +94,15 @@ export default function InsightsScreen() {
   // Spend trend based on selected granularity
   const trend = useMemo(() => {
     if (granularity === 'weekly') {
-      return weeklySpendTrend(expenses, from, to);
+      return isNoCycleView
+        ? calendarWeeklySpendTrend(expenses, from, to)
+        : weeklySpendTrend(expenses, from, to);
     }
     if (granularity === 'monthly') {
       return monthlySpendTrend(expenses, from, to);
     }
     return dailySpendTrend(expenses, from, to);
-  }, [expenses, from, to, granularity]);
+  }, [expenses, from, to, granularity, isNoCycleView]);
 
   const breakdown = useMemo(() => categoryBreakdown(expenses, from, to), [expenses, from, to]);
   const savingsPeriod = useMemo(
@@ -120,12 +140,12 @@ export default function InsightsScreen() {
       expenses,
       from,
       to,
-      allowanceMinor: preferences.allowanceMinor,
+      allowanceMinor: isNoCycleView ? 0 : preferences.allowanceMinor,
       savingsTransactions: goalTransactions,
       trend,
       currency: preferences.currency,
     });
-  }, [ready, error, expenses, from, to, preferences.allowanceMinor, preferences.currency, goalTransactions, trend]);
+  }, [ready, error, expenses, from, to, isNoCycleView, preferences.allowanceMinor, preferences.currency, goalTransactions, trend]);
 
   const mindfulStats = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -194,7 +214,7 @@ export default function InsightsScreen() {
         <View style={styles.rangeSelector}>
           {(
             [
-              { id: 'cycle', label: 'This Cycle' },
+              { id: 'cycle', label: isNoCycleView ? 'This Month' : 'This Cycle' },
               { id: '7d', label: 'Last 7 Days' },
               { id: '30d', label: 'Last 30 Days' },
             ] as const
@@ -353,6 +373,16 @@ export default function InsightsScreen() {
               ) : null}
             </Surface>
 
+            <Surface style={{ gap: Spacing.eight }}>
+              <SectionTitle title="Income Received" detail={label} />
+              <AppText variant="headline" weight="700" tabular>
+                {formatMoney(totalIncome, preferences.currency)}
+              </AppText>
+              <AppText variant="caption" color={p.textSecondary}>
+                All income records dated in this reporting period.
+              </AppText>
+            </Surface>
+
             {/* Card 2: Top Categories with Donut-style Circular Graphic */}
             <Surface style={{ gap: Spacing.sixteen }}>
               <View style={[ui.row, { justifyContent: 'space-between' }]}>
@@ -462,7 +492,17 @@ export default function InsightsScreen() {
                       <View style={{ flex: 1, gap: Spacing.eight }}>
                         {segments.map((segment) => (
                           <View key={segment.category} style={[ui.row, { justifyContent: 'space-between', gap: Spacing.eight }]}>
-                            <AppText variant="captionMedium" weight="600">{segment.category}</AppText>
+                            <View style={[ui.row, { flex: 1, gap: Spacing.eight }]}>
+                              <View
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: 4,
+                                  backgroundColor: categoryColor(segment.category),
+                                }}
+                              />
+                              <AppText variant="captionMedium" weight="600">{segment.category}</AppText>
+                            </View>
                             <AppText variant="captionMedium" color={p.textSecondary} tabular>
                               {Math.round(segment.percentage)}%
                             </AppText>

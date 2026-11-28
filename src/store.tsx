@@ -1,9 +1,22 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { SQLiteDatabase, SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
-import { applyGoalBalanceChange, generateBackupJSON, reconcileGoalBalances, validateBackupPayload } from '@/finance.mjs';
+import {
+  applyGoalBalanceChange,
+  calculateBudgetSummary,
+  calculateNoCycleSummary,
+  cycleStart,
+  generateBackupJSON,
+  isNoCycleBudgetActive,
+  normalizeTransactionDescription,
+  nextCycleStart,
+  reconcileGoalBalances,
+  sumExpenses,
+  validateBackupPayload,
+} from '@/finance.mjs';
 
 export type Category = 'Food' | 'Transport' | 'Study' | 'Social' | 'Shopping' | 'Other';
 export type Reflection = 'Planned' | 'Spontaneous' | 'Needed' | 'Just wanted it';
+export type BudgetingMode = 'monthly_cycle' | 'no_cycle';
 export type Expense = {
   id: number;
   amountMinor: number;
@@ -49,6 +62,12 @@ export type Preferences = {
   currency: string;
   allowanceMinor: number;
   cycleStartDay: number;
+  budgetingMode: BudgetingMode;
+  noCycleOpeningBalanceMinor: number;
+  noCycleExpensesThroughId: number;
+  noCycleIncomesThroughId: number;
+  noCycleGoalTransactionsThroughId: number;
+  monthlyEffectiveAt: string | null;
   themeMode: 'system' | 'light' | 'dark';
   pacingMode: PacingMode;
   onboarded: boolean;
@@ -70,10 +89,149 @@ const DEFAULT_PREFERENCES: Preferences = {
   currency: 'INR',
   allowanceMinor: 0,
   cycleStartDay: 1,
+  budgetingMode: 'monthly_cycle',
+  noCycleOpeningBalanceMinor: 0,
+  noCycleExpensesThroughId: 0,
+  noCycleIncomesThroughId: 0,
+  noCycleGoalTransactionsThroughId: 0,
+  monthlyEffectiveAt: null,
   themeMode: 'system',
   pacingMode: 'adaptive',
   onboarded: false,
 };
+
+type StoredBudgetPreferences = {
+  allowance_minor: number;
+  cycle_start_day: number;
+  budgeting_mode: string;
+  no_cycle_opening_balance_minor: number;
+  no_cycle_expenses_through_id: number;
+  no_cycle_incomes_through_id: number;
+  no_cycle_goal_transactions_through_id: number;
+  monthly_effective_at: string | null;
+};
+
+async function getTransactionIdCutoffs(db: SQLiteDatabase) {
+  const [expense, income, goalTransaction] = await Promise.all([
+    db.getFirstAsync<{ max_id: number }>('SELECT COALESCE(MAX(id), 0) AS max_id FROM expenses'),
+    db.getFirstAsync<{ max_id: number }>('SELECT COALESCE(MAX(id), 0) AS max_id FROM incomes'),
+    db.getFirstAsync<{ max_id: number }>('SELECT COALESCE(MAX(id), 0) AS max_id FROM goal_transactions'),
+  ]);
+  return {
+    expensesThroughId: Number(expense?.max_id ?? 0),
+    incomesThroughId: Number(income?.max_id ?? 0),
+    goalTransactionsThroughId: Number(goalTransaction?.max_id ?? 0),
+  };
+}
+
+async function calculateStoredAvailableBalance(
+  db: SQLiteDatabase,
+  preferences: StoredBudgetPreferences,
+  now: Date,
+  noCycleActive: boolean
+) {
+  const [expenseRows, incomeRows, goals, goalTransactionRows] = await Promise.all([
+    db.getAllAsync<{ id: number; amount_minor: number; occurred_at: string }>(
+      'SELECT id, amount_minor, occurred_at FROM expenses'
+    ),
+    db.getAllAsync<{ id: number; amount_minor: number; source: string; occurred_at: string }>(
+      'SELECT id, amount_minor, source, occurred_at FROM incomes'
+    ),
+    db.getAllAsync<{ id: number; deleted_at: string | null }>(
+      'SELECT id, deleted_at FROM goals'
+    ),
+    db.getAllAsync<{
+      id: number;
+      goal_id: number;
+      kind: 'deposit' | 'withdrawal';
+      amount_minor: number;
+      occurred_at: string;
+    }>('SELECT id, goal_id, kind, amount_minor, occurred_at FROM goal_transactions'),
+  ]);
+  const expenses = expenseRows.map((row) => ({
+    id: row.id,
+    amountMinor: row.amount_minor,
+    occurredAt: row.occurred_at,
+  }));
+  const incomes = incomeRows.map((row) => ({
+    id: row.id,
+    amountMinor: row.amount_minor,
+    source: row.source,
+    occurredAt: row.occurred_at,
+  }));
+  const goalTransactions = goalTransactionRows.map((row) => ({
+    id: row.id,
+    goalId: row.goal_id,
+    kind: row.kind,
+    amountMinor: row.amount_minor,
+    occurredAt: row.occurred_at,
+  }));
+
+  if (noCycleActive) {
+    return calculateNoCycleSummary({
+      openingBalanceMinor: preferences.no_cycle_opening_balance_minor,
+      expensesThroughId: preferences.no_cycle_expenses_through_id,
+      incomesThroughId: preferences.no_cycle_incomes_through_id,
+      goalTransactionsThroughId: preferences.no_cycle_goal_transactions_through_id,
+      expenses,
+      incomes,
+      goalTransactions,
+    }).availableMinor;
+  }
+
+  const activeGoals = goals.filter((goal) => goal.deleted_at === null);
+  const savedBalances = reconcileGoalBalances(activeGoals, goalTransactions);
+  const savingsReservedMinor = Object.values(savedBalances).reduce(
+    (total, amount) => total + Math.max(0, Number(amount) || 0),
+    0
+  );
+  const start = cycleStart(now, Math.min(28, Math.max(1, preferences.cycle_start_day)));
+  return calculateBudgetSummary({
+    allowanceMinor: preferences.allowance_minor,
+    incomes,
+    cycleStartDate: start,
+    cycleThroughDate: now,
+    expenseMinor: sumExpenses(expenses, start, now),
+    savingsReservedMinor,
+  }).availableMinor;
+}
+
+async function adjustNoCycleOpeningBalance(
+  db: SQLiteDatabase,
+  transactionId: number,
+  kind: 'expense' | 'income',
+  amountDeltaMinor: number
+) {
+  const preferences = await db.getFirstAsync<{
+    budgeting_mode: string;
+    monthly_effective_at: string | null;
+    no_cycle_opening_balance_minor: number;
+    no_cycle_expenses_through_id: number;
+    no_cycle_incomes_through_id: number;
+  }>(`
+    SELECT budgeting_mode, monthly_effective_at, no_cycle_opening_balance_minor,
+      no_cycle_expenses_through_id, no_cycle_incomes_through_id
+    FROM preferences WHERE id=1
+  `);
+  if (!preferences) return null;
+  const now = Date.now();
+  const noCycleActive =
+    isNoCycleBudgetActive(
+      { budgetingMode: preferences.budgeting_mode === 'no_cycle' ? 'no_cycle' : 'monthly_cycle', monthlyEffectiveAt: preferences.monthly_effective_at },
+      new Date(now)
+    );
+  const throughId = kind === 'expense'
+    ? preferences.no_cycle_expenses_through_id
+    : preferences.no_cycle_incomes_through_id;
+  if (!noCycleActive || transactionId > throughId) return null;
+
+  const openingBalanceMinor = preferences.no_cycle_opening_balance_minor + amountDeltaMinor;
+  await db.runAsync(
+    'UPDATE preferences SET no_cycle_opening_balance_minor=? WHERE id=1',
+    openingBalanceMinor
+  );
+  return openingBalanceMinor;
+}
 
 export async function migrateDatabase(db: SQLiteDatabase) {
   await db.execAsync(
@@ -299,6 +457,60 @@ export async function migrateDatabase(db: SQLiteDatabase) {
       `);
     });
   }
+
+  const v9Result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  if ((v9Result?.user_version ?? 0) < 9) {
+    await db.withTransactionAsync(async () => {
+      const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(preferences)');
+      const names = new Set(columns.map((column) => column.name));
+      if (!names.has('budgeting_mode')) {
+        await db.execAsync("ALTER TABLE preferences ADD COLUMN budgeting_mode TEXT NOT NULL DEFAULT 'monthly_cycle' CHECK (budgeting_mode IN ('monthly_cycle','no_cycle'))");
+      }
+      if (!names.has('no_cycle_opening_balance_minor')) {
+        await db.execAsync('ALTER TABLE preferences ADD COLUMN no_cycle_opening_balance_minor INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!names.has('no_cycle_expenses_through_id')) {
+        await db.execAsync('ALTER TABLE preferences ADD COLUMN no_cycle_expenses_through_id INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!names.has('no_cycle_incomes_through_id')) {
+        await db.execAsync('ALTER TABLE preferences ADD COLUMN no_cycle_incomes_through_id INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!names.has('no_cycle_goal_transactions_through_id')) {
+        await db.execAsync('ALTER TABLE preferences ADD COLUMN no_cycle_goal_transactions_through_id INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!names.has('monthly_effective_at')) {
+        await db.execAsync('ALTER TABLE preferences ADD COLUMN monthly_effective_at TEXT');
+      }
+      await db.execAsync(`
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (9, datetime('now'));
+        PRAGMA user_version = 9;
+      `);
+    });
+  }
+
+  const v10Result = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  if ((v10Result?.user_version ?? 0) < 10) {
+    await db.withTransactionAsync(async () => {
+      const [expenseTitles, incomeTitles] = await Promise.all([
+        db.getAllAsync<{ id: number; title: string | null }>('SELECT id, title FROM expenses'),
+        db.getAllAsync<{ id: number; title: string | null }>('SELECT id, title FROM incomes'),
+      ]);
+      for (const expense of expenseTitles) {
+        if (typeof expense.title !== 'string' || expense.title.trim().length === 0) {
+          await db.runAsync('UPDATE expenses SET title=? WHERE id=?', 'Unspecified Expense', expense.id);
+        }
+      }
+      for (const income of incomeTitles) {
+        if (typeof income.title !== 'string' || income.title.trim().length === 0) {
+          await db.runAsync('UPDATE incomes SET title=? WHERE id=?', 'Unspecified Income', income.id);
+        }
+      }
+      await db.execAsync(`
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (10, datetime('now'));
+        PRAGMA user_version = 10;
+      `);
+    });
+  }
 }
 
 export type ExpenseInput = Omit<Expense, 'id'>;
@@ -321,6 +533,7 @@ type Store = {
   updateExpense: (e: Expense) => Promise<void>;
   removeExpense: (id: number) => Promise<void>;
   addIncome: (e: IncomeInput) => Promise<void>;
+  updateIncome: (e: Income) => Promise<void>;
   removeIncome: (id: number) => Promise<void>;
   saveGoal: (name: string, targetMinor: number) => Promise<void>;
   updateGoal: (id: number, name: string, targetMinor: number) => Promise<void>;
@@ -355,6 +568,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [goalRecords, setGoalRecords] = useState<Goal[]>([]);
   const [goalTransactions, setGoalTransactions] = useState<GoalTransaction[]>([]);
   const goalOperationLocks = useRef(new Set<number>());
+  const incomeDeleteLocks = useRef(new Set<number>());
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [zeroSpendDays, setZeroSpendDays] = useState<string[]>([]);
 
@@ -366,6 +580,12 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
           currency: string;
           allowance_minor: number;
           cycle_start_day: number;
+          budgeting_mode: string;
+          no_cycle_opening_balance_minor: number;
+          no_cycle_expenses_through_id: number;
+          no_cycle_incomes_through_id: number;
+          no_cycle_goal_transactions_through_id: number;
+          monthly_effective_at: string | null;
           theme_mode: 'system' | 'light' | 'dark';
           pacing_mode?: 'adaptive' | 'fixed';
           onboarded: number;
@@ -415,6 +635,12 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
           currency: pref.currency,
           allowanceMinor: pref.allowance_minor,
           cycleStartDay: Math.min(28, Math.max(1, pref.cycle_start_day)),
+          budgetingMode: pref.budgeting_mode === 'no_cycle' ? 'no_cycle' : 'monthly_cycle',
+          noCycleOpeningBalanceMinor: pref.no_cycle_opening_balance_minor,
+          noCycleExpensesThroughId: pref.no_cycle_expenses_through_id,
+          noCycleIncomesThroughId: pref.no_cycle_incomes_through_id,
+          noCycleGoalTransactionsThroughId: pref.no_cycle_goal_transactions_through_id,
+          monthlyEffectiveAt: pref.monthly_effective_at,
           themeMode: pref.theme_mode,
           pacingMode: pref.pacing_mode === 'fixed' ? 'fixed' : 'adaptive',
           onboarded: Boolean(pref.onboarded),
@@ -424,7 +650,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         rows.map((r) => ({
           id: r.id,
           amountMinor: r.amount_minor,
-          title: r.title,
+          title: normalizeTransactionDescription(r.title, 'Unspecified Expense'),
           category: r.category,
           occurredAt: r.occurred_at,
           reflection: r.reflection,
@@ -435,7 +661,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         incomeRows.map((r) => ({
           id: r.id,
           amountMinor: r.amount_minor,
-          title: r.title,
+          title: normalizeTransactionDescription(r.title, 'Unspecified Income'),
           source: r.source,
           occurredAt: r.occurred_at,
           note: r.note,
@@ -487,21 +713,75 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const savePreferences = useCallback(
     async (patch: Partial<Preferences>) => {
-      const next = {
+      const next: Preferences = {
         ...preferences,
         ...patch,
         cycleStartDay: patch.cycleStartDay !== undefined ? Math.min(28, Math.max(1, patch.cycleStartDay)) : preferences.cycleStartDay,
       };
-      await db.runAsync(
-        'UPDATE preferences SET name=?, currency=?, allowance_minor=?, cycle_start_day=?, theme_mode=?, pacing_mode=?, onboarded=? WHERE id=1',
-        next.name,
-        next.currency,
-        next.allowanceMinor,
-        next.cycleStartDay,
-        next.themeMode,
-        next.pacingMode,
-        Number(next.onboarded)
-      );
+      await db.withTransactionAsync(async () => {
+        const stored = await db.getFirstAsync<StoredBudgetPreferences>(
+          `SELECT allowance_minor, cycle_start_day, budgeting_mode,
+            no_cycle_opening_balance_minor, no_cycle_expenses_through_id,
+            no_cycle_incomes_through_id, no_cycle_goal_transactions_through_id,
+            monthly_effective_at
+          FROM preferences WHERE id=1`
+        );
+        if (!stored) throw new Error('Preferences could not be loaded.');
+
+        const storedMode: BudgetingMode = stored.budgeting_mode === 'no_cycle' ? 'no_cycle' : 'monthly_cycle';
+        const targetMode = patch.budgetingMode ?? storedMode;
+        const now = new Date();
+        const currentNoCycleActive =
+          isNoCycleBudgetActive(
+            { budgetingMode: storedMode, monthlyEffectiveAt: stored.monthly_effective_at },
+            now
+          );
+
+        if (targetMode === 'no_cycle' && (storedMode !== 'no_cycle' || patch.noCycleOpeningBalanceMinor !== undefined)) {
+          const openingBalanceMinor =
+            patch.noCycleOpeningBalanceMinor !== undefined
+              ? patch.noCycleOpeningBalanceMinor
+              : await calculateStoredAvailableBalance(db, stored, now, currentNoCycleActive);
+          if (!Number.isSafeInteger(openingBalanceMinor)) {
+            throw new Error('The opening balance is outside the supported range.');
+          }
+          const cutoffs = await getTransactionIdCutoffs(db);
+          next.noCycleOpeningBalanceMinor = openingBalanceMinor;
+          next.noCycleExpensesThroughId = cutoffs.expensesThroughId;
+          next.noCycleIncomesThroughId = cutoffs.incomesThroughId;
+          next.noCycleGoalTransactionsThroughId = cutoffs.goalTransactionsThroughId;
+          next.monthlyEffectiveAt = null;
+        } else if (targetMode === 'monthly_cycle' && currentNoCycleActive && patch.budgetingMode === 'monthly_cycle') {
+          next.monthlyEffectiveAt = nextCycleStart(now, next.cycleStartDay).toISOString();
+        } else if (
+          targetMode === 'monthly_cycle' &&
+          next.monthlyEffectiveAt !== null &&
+          Date.parse(next.monthlyEffectiveAt) > now.getTime() &&
+          patch.cycleStartDay !== undefined
+        ) {
+          next.monthlyEffectiveAt = nextCycleStart(now, next.cycleStartDay).toISOString();
+        }
+
+        await db.runAsync(
+          `UPDATE preferences SET name=?, currency=?, allowance_minor=?, cycle_start_day=?,
+            budgeting_mode=?, no_cycle_opening_balance_minor=?, no_cycle_expenses_through_id=?,
+            no_cycle_incomes_through_id=?, no_cycle_goal_transactions_through_id=?,
+            monthly_effective_at=?, theme_mode=?, pacing_mode=?, onboarded=? WHERE id=1`,
+          next.name,
+          next.currency,
+          next.allowanceMinor,
+          next.cycleStartDay,
+          next.budgetingMode,
+          next.noCycleOpeningBalanceMinor,
+          next.noCycleExpensesThroughId,
+          next.noCycleIncomesThroughId,
+          next.noCycleGoalTransactionsThroughId,
+          next.monthlyEffectiveAt,
+          next.themeMode,
+          next.pacingMode,
+          Number(next.onboarded)
+        );
+      });
       setPreferences(next);
     },
     [db, preferences]
@@ -513,7 +793,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       const result = await db.runAsync(
         'INSERT INTO expenses (amount_minor, title, category, occurred_at, reflection, note, created_at) VALUES (?,?,?,?,?,?,?)',
         e.amountMinor,
-        e.title.trim(),
+        normalizeTransactionDescription(e.title, 'Unspecified Expense'),
         e.category,
         e.occurredAt,
         e.reflection,
@@ -521,7 +801,11 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         createdAt
       );
       setExpenses((current) =>
-        [{ ...e, id: result.lastInsertRowId }, ...current].sort(
+        [{
+          ...e,
+          title: normalizeTransactionDescription(e.title, 'Unspecified Expense'),
+          id: result.lastInsertRowId,
+        }, ...current].sort(
           (a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id - a.id
         )
       );
@@ -531,19 +815,41 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const updateExpense = useCallback(
     async (e: Expense) => {
-      await db.runAsync(
-        'UPDATE expenses SET amount_minor=?, title=?, category=?, occurred_at=?, reflection=?, note=? WHERE id=?',
-        e.amountMinor,
-        e.title.trim(),
-        e.category,
-        e.occurredAt,
-        e.reflection,
-        e.note,
-        e.id
-      );
+      let adjustedOpeningBalance: number | null = null;
+      await db.withTransactionAsync(async () => {
+        const previous = await db.getFirstAsync<{ amount_minor: number }>(
+          'SELECT amount_minor FROM expenses WHERE id=?',
+          e.id
+        );
+        if (!previous) throw new Error(`Expense record ${e.id} no longer exists.`);
+        adjustedOpeningBalance = await adjustNoCycleOpeningBalance(
+          db,
+          e.id,
+          'expense',
+          previous.amount_minor - e.amountMinor
+        );
+        await db.runAsync(
+          'UPDATE expenses SET amount_minor=?, title=?, category=?, occurred_at=?, reflection=?, note=? WHERE id=?',
+          e.amountMinor,
+          normalizeTransactionDescription(e.title, 'Unspecified Expense'),
+          e.category,
+          e.occurredAt,
+          e.reflection,
+          e.note,
+          e.id
+        );
+      });
+      const openingBalanceAdjustment = adjustedOpeningBalance;
+      if (openingBalanceAdjustment !== null) {
+        setPreferences((current) => ({ ...current, noCycleOpeningBalanceMinor: openingBalanceAdjustment }));
+      }
       setExpenses((current) =>
         current
-          .map((item) => (item.id === e.id ? { ...e, title: e.title.trim() } : item))
+          .map((item) =>
+            item.id === e.id
+              ? { ...e, title: normalizeTransactionDescription(e.title, 'Unspecified Expense') }
+              : item
+          )
           .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id - a.id)
       );
     },
@@ -552,7 +858,20 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const removeExpense = useCallback(
     async (id: number) => {
-      await db.runAsync('DELETE FROM expenses WHERE id=?', id);
+      let adjustedOpeningBalance: number | null = null;
+      await db.withTransactionAsync(async () => {
+        const previous = await db.getFirstAsync<{ amount_minor: number }>(
+          'SELECT amount_minor FROM expenses WHERE id=?',
+          id
+        );
+        if (!previous) return;
+        adjustedOpeningBalance = await adjustNoCycleOpeningBalance(db, id, 'expense', previous.amount_minor);
+        await db.runAsync('DELETE FROM expenses WHERE id=?', id);
+      });
+      const openingBalanceAdjustment = adjustedOpeningBalance;
+      if (openingBalanceAdjustment !== null) {
+        setPreferences((current) => ({ ...current, noCycleOpeningBalanceMinor: openingBalanceAdjustment }));
+      }
       setExpenses((current) => current.filter((expense) => expense.id !== id));
     },
     [db]
@@ -564,14 +883,14 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       const result = await db.runAsync(
         'INSERT INTO incomes (amount_minor, title, source, occurred_at, note, created_at) VALUES (?,?,?,?,?,?)',
         e.amountMinor,
-        e.title.trim(),
+        normalizeTransactionDescription(e.title, 'Unspecified Income'),
         e.source,
         e.occurredAt,
         e.note,
         createdAt
       );
       setIncomes((current) =>
-        [{ ...e, id: result.lastInsertRowId }, ...current].sort(
+        [{ ...e, title: normalizeTransactionDescription(e.title, 'Unspecified Income'), id: result.lastInsertRowId }, ...current].sort(
           (a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id - a.id
         )
       );
@@ -581,8 +900,73 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const removeIncome = useCallback(
     async (id: number) => {
-      await db.runAsync('DELETE FROM incomes WHERE id=?', id);
-      setIncomes((current) => current.filter((income) => income.id !== id));
+      if (incomeDeleteLocks.current.has(id)) return;
+      incomeDeleteLocks.current.add(id);
+      try {
+        let adjustedOpeningBalance: number | null = null;
+        await db.withTransactionAsync(async () => {
+          const previous = await db.getFirstAsync<{ amount_minor: number }>(
+            'SELECT amount_minor FROM incomes WHERE id=?',
+            id
+          );
+          if (!previous) return;
+          adjustedOpeningBalance = await adjustNoCycleOpeningBalance(db, id, 'income', -previous.amount_minor);
+          await db.runAsync('DELETE FROM incomes WHERE id=?', id);
+        });
+        const openingBalanceAdjustment = adjustedOpeningBalance;
+        if (openingBalanceAdjustment !== null) {
+          setPreferences((current) => ({ ...current, noCycleOpeningBalanceMinor: openingBalanceAdjustment }));
+        }
+        setIncomes((current) => current.filter((income) => income.id !== id));
+      } finally {
+        incomeDeleteLocks.current.delete(id);
+      }
+    },
+    [db]
+  );
+
+  const updateIncome = useCallback(
+    async (e: Income) => {
+      let adjustedOpeningBalance: number | null = null;
+      await db.withTransactionAsync(async () => {
+        const previous = await db.getFirstAsync<{ amount_minor: number }>(
+          'SELECT amount_minor FROM incomes WHERE id=?',
+          e.id
+        );
+        if (!previous) throw new Error(`Income record ${e.id} no longer exists.`);
+        adjustedOpeningBalance = await adjustNoCycleOpeningBalance(
+          db,
+          e.id,
+          'income',
+          e.amountMinor - previous.amount_minor
+        );
+        await db.runAsync(
+          'UPDATE incomes SET amount_minor=?, title=?, source=?, occurred_at=?, note=? WHERE id=?',
+          e.amountMinor,
+          normalizeTransactionDescription(e.title, 'Unspecified Income'),
+          e.source.trim(),
+          e.occurredAt,
+          e.note,
+          e.id
+        );
+      });
+      const openingBalanceAdjustment = adjustedOpeningBalance;
+      if (openingBalanceAdjustment !== null) {
+        setPreferences((current) => ({ ...current, noCycleOpeningBalanceMinor: openingBalanceAdjustment }));
+      }
+      setIncomes((current) =>
+        current
+          .map((income) =>
+            income.id === e.id
+              ? {
+                  ...e,
+                  title: normalizeTransactionDescription(e.title, 'Unspecified Income'),
+                  source: e.source.trim(),
+                }
+              : income
+          )
+          .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id - a.id)
+      );
     },
     [db]
   );
@@ -846,7 +1230,11 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       await db.runAsync('DELETE FROM goals');
       await db.runAsync('DELETE FROM category_budgets');
       await db.runAsync('DELETE FROM zero_spend_days');
-      await db.runAsync('UPDATE preferences SET name="", allowance_minor=0, cycle_start_day=1, pacing_mode="adaptive", onboarded=0 WHERE id=1');
+      await db.runAsync(`UPDATE preferences SET name="", allowance_minor=0, cycle_start_day=1,
+        budgeting_mode='monthly_cycle', no_cycle_opening_balance_minor=0,
+        no_cycle_expenses_through_id=0, no_cycle_incomes_through_id=0,
+        no_cycle_goal_transactions_through_id=0, monthly_effective_at=NULL,
+        pacing_mode='adaptive', onboarded=0 WHERE id=1`);
     });
     await refresh();
   }, [db, refresh]);
@@ -883,16 +1271,44 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
         incomes,
         goalTransactions
       );
+      const currentNoCycleActive =
+        isNoCycleBudgetActive(preferences);
+      const currentAvailableBalance = await calculateStoredAvailableBalance(
+        db,
+        {
+          allowance_minor: preferences.allowanceMinor,
+          cycle_start_day: preferences.cycleStartDay,
+          budgeting_mode: preferences.budgetingMode,
+          no_cycle_opening_balance_minor: preferences.noCycleOpeningBalanceMinor,
+          no_cycle_expenses_through_id: preferences.noCycleExpensesThroughId,
+          no_cycle_incomes_through_id: preferences.noCycleIncomesThroughId,
+          no_cycle_goal_transactions_through_id: preferences.noCycleGoalTransactionsThroughId,
+          monthly_effective_at: preferences.monthlyEffectiveAt,
+        },
+        new Date(),
+        currentNoCycleActive
+      );
 
       const applyPayload = async (source: typeof payload) => {
         await db.withTransactionAsync(async () => {
           if (source.preferences) {
             await db.runAsync(
-              'UPDATE preferences SET name=?, currency=?, allowance_minor=?, cycle_start_day=?, theme_mode=?, pacing_mode=?, onboarded=? WHERE id=1',
+              `UPDATE preferences SET name=?, currency=?, allowance_minor=?, cycle_start_day=?,
+                budgeting_mode=?, no_cycle_opening_balance_minor=?, no_cycle_expenses_through_id=?,
+                no_cycle_incomes_through_id=?, no_cycle_goal_transactions_through_id=?,
+                monthly_effective_at=?, theme_mode=?, pacing_mode=?, onboarded=? WHERE id=1`,
               source.preferences.name || '',
               source.preferences.currency || 'INR',
               source.preferences.allowanceMinor || 0,
               source.preferences.cycleStartDay || 1,
+              source.preferences.budgetingMode ?? preferences.budgetingMode,
+              source.preferences.noCycleOpeningBalanceMinor ?? preferences.noCycleOpeningBalanceMinor,
+              source.preferences.noCycleExpensesThroughId ?? preferences.noCycleExpensesThroughId,
+              source.preferences.noCycleIncomesThroughId ?? preferences.noCycleIncomesThroughId,
+              source.preferences.noCycleGoalTransactionsThroughId ?? preferences.noCycleGoalTransactionsThroughId,
+              source.preferences.monthlyEffectiveAt !== undefined
+                ? source.preferences.monthlyEffectiveAt
+                : preferences.monthlyEffectiveAt,
               source.preferences.themeMode || 'system',
               source.preferences.pacingMode || 'adaptive',
               Number(source.preferences.onboarded) || 0
@@ -905,7 +1321,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
                 'INSERT INTO expenses (id, amount_minor, title, category, occurred_at, reflection, note, created_at) VALUES (?,?,?,?,?,?,?,?)',
                 e.id,
                 e.amountMinor,
-                e.title,
+                normalizeTransactionDescription(e.title, 'Unspecified Expense'),
                 e.category,
                 e.occurredAt,
                 e.reflection || null,
@@ -921,7 +1337,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
                 'INSERT INTO incomes (id, amount_minor, title, source, occurred_at, note, created_at) VALUES (?,?,?,?,?,?,?)',
                 inc.id,
                 inc.amountMinor,
-                inc.title,
+                normalizeTransactionDescription(inc.title, 'Unspecified Income'),
                 inc.source || 'Other',
                 inc.occurredAt,
                 inc.note || null,
@@ -989,6 +1405,27 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
               await db.runAsync('INSERT INTO zero_spend_days (date_key, created_at) VALUES (?, ?)', String(dateKey), new Date().toISOString());
             }
           }
+
+          const targetMode = source.preferences?.budgetingMode ?? preferences.budgetingMode;
+          if (
+            targetMode === 'no_cycle' &&
+            (!source.preferences ||
+              source.preferences.noCycleOpeningBalanceMinor === undefined ||
+              source.preferences.noCycleExpensesThroughId === undefined ||
+              source.preferences.noCycleIncomesThroughId === undefined ||
+              source.preferences.noCycleGoalTransactionsThroughId === undefined)
+          ) {
+            const cutoffs = await getTransactionIdCutoffs(db);
+            await db.runAsync(
+              `UPDATE preferences SET no_cycle_opening_balance_minor=?,
+                no_cycle_expenses_through_id=?, no_cycle_incomes_through_id=?,
+                no_cycle_goal_transactions_through_id=?, monthly_effective_at=NULL WHERE id=1`,
+              currentAvailableBalance,
+              cutoffs.expensesThroughId,
+              cutoffs.incomesThroughId,
+              cutoffs.goalTransactionsThroughId
+            );
+          }
         });
       };
 
@@ -1033,6 +1470,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       updateExpense,
       removeExpense,
       addIncome,
+      updateIncome,
       removeIncome,
       saveGoal,
       updateGoal,
@@ -1062,6 +1500,7 @@ function FinanceProvider({ children }: { children: React.ReactNode }) {
       updateExpense,
       removeExpense,
       addIncome,
+      updateIncome,
       removeIncome,
       saveGoal,
       updateGoal,

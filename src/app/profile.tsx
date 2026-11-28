@@ -14,11 +14,13 @@ import {
   currencyDigits,
   generateBackupJSON,
   generateExpensesCSV,
+  isNoCycleBudgetActive,
+  nextCycleStart,
   toMinorUnits,
 } from "@/finance.mjs";
 import { CATEGORIES, Category, useFinance } from "@/store";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -36,6 +38,13 @@ function formatMinorToInput(minor: number, currency: string) {
 export default function ProfileScreen() {
   const p = usePalette();
   const onAccent = useAccentForeground();
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const nextDay = new Date();
+    nextDay.setHours(24, 0, 0, 0);
+    const timeout = setTimeout(() => setNow(new Date()), nextDay.getTime() - Date.now() + 1);
+    return () => clearTimeout(timeout);
+  }, [now]);
   const {
     preferences,
     expenses,
@@ -65,6 +74,11 @@ export default function ProfileScreen() {
   const [pendingPacingMode, setPendingPacingMode] = useState(
     preferences.pacingMode,
   );
+  const [budgetModeSaving, setBudgetModeSaving] = useState(false);
+  const isMonthlyCycleScheduled =
+    preferences.budgetingMode === "monthly_cycle" &&
+    isNoCycleBudgetActive(preferences, now) &&
+    preferences.monthlyEffectiveAt !== null;
 
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -176,6 +190,66 @@ export default function ProfileScreen() {
     }
   };
 
+  const changeBudgetingMode = (mode: "monthly_cycle" | "no_cycle") => {
+    if (mode === preferences.budgetingMode || budgetModeSaving) return;
+    if (mode === "no_cycle") {
+      Alert.alert(
+        "Switch To No Fixed Cycle?",
+        "Your current available balance will become the opening balance. Income, expenses, and savings activity recorded from now on will update it without a monthly reset.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Switch Mode",
+            onPress: () => {
+              setBudgetModeSaving(true);
+              void savePreferences({ budgetingMode: "no_cycle" })
+                .then(() => {
+                  setError("");
+                  setNotice("No Fixed Cycle budgeting enabled.");
+                })
+                .catch(() => setError("Could not change budgeting mode."))
+                .finally(() => setBudgetModeSaving(false));
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    const parsed = Number(allowance.replace(/,/g, ""));
+    const allowanceMinor = toMinorUnits(parsed, preferences.currency);
+    if (!allowanceMinor) {
+      setError("Set a monthly allowance greater than zero before switching modes.");
+      return;
+    }
+    const effectiveDate = nextCycleStart(new Date(), preferences.cycleStartDay);
+    Alert.alert(
+      "Schedule Monthly Cycle?",
+      `Monthly Cycle will begin on ${effectiveDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}. Until then, No Fixed Cycle remains active and your current balance continues to update. The configured allowance starts on that reset date; unused balance will not carry into later cycles.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Schedule",
+          onPress: () => {
+            setBudgetModeSaving(true);
+            void savePreferences({
+              budgetingMode: "monthly_cycle",
+              allowanceMinor,
+            })
+              .then(() => {
+                setError("");
+                setNotice(
+                  `Monthly Cycle scheduled for ${effectiveDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`
+                );
+              })
+              .catch(() => setError("Could not change budgeting mode."))
+              .finally(() => setBudgetModeSaving(false));
+          },
+        },
+      ],
+    );
+  };
+
   const changeAppearance = async (mode: "system" | "light" | "dark") => {
     try {
       await savePreferences({ themeMode: mode });
@@ -273,11 +347,70 @@ export default function ProfileScreen() {
           </Surface>
         ) : null}
 
+        {/* Budgeting Mode */}
+        <View style={{ gap: Spacing.twelve }}>
+          <SectionTitle
+            title="Budgeting Mode"
+            detail={
+              isMonthlyCycleScheduled
+                ? "Monthly Cycle is scheduled; No Fixed Cycle remains active until the reset date."
+                : "Choose whether your available balance follows a monthly allowance cycle."
+            }
+          />
+          <Surface style={{ gap: Spacing.twelve }}>
+            {([
+              { id: "monthly_cycle" as const, label: "Monthly Cycle" },
+              { id: "no_cycle" as const, label: "No Fixed Cycle" },
+            ]).map((option) => {
+              const active = preferences.budgetingMode === option.id;
+              return (
+                <Pressable
+                  key={option.id}
+                  onPress={() => changeBudgetingMode(option.id)}
+                  disabled={budgetModeSaving}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active, disabled: budgetModeSaving }}
+                  style={[
+                    styles.cycleChip,
+                    {
+                      backgroundColor: active ? p.accent : p.backgroundSelected,
+                      borderColor: active ? p.accent : p.border,
+                      borderWidth: 1,
+                      alignSelf: "flex-start",
+                    },
+                  ]}
+                >
+                  <AppText
+                    variant="captionMedium"
+                    color={active ? onAccent : p.text}
+                  >
+                    {option.label}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+            {isMonthlyCycleScheduled && preferences.monthlyEffectiveAt ? (
+              <Surface style={{ gap: Spacing.four, backgroundColor: p.accentSoft }}>
+                <AppText variant="bodyMedium" weight="700" color={p.accent}>
+                  Monthly Cycle Scheduled
+                </AppText>
+                <AppText variant="caption" color={p.textSecondary}>
+                  Your monthly cycle begins on {new Date(preferences.monthlyEffectiveAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}. Your current balance remains active until then.
+                </AppText>
+              </Surface>
+            ) : null}
+          </Surface>
+        </View>
+
         {/* Allowance & Cycle */}
         <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
-            title="Allowance Cycle"
-            detail="The amount you plan your everyday spending around"
+            title="Monthly Allowance"
+            detail={
+              preferences.budgetingMode === "monthly_cycle"
+                ? "The recurring amount you plan your everyday spending around."
+                : "Configure this amount before switching to Monthly Cycle."
+            }
           />
           <Surface style={{ gap: Spacing.twelve }}>
             <AppText variant="eyebrow" color={p.textSecondary}>

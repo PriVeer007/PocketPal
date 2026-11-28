@@ -19,11 +19,14 @@ import {
 import {
   allowanceProgress,
   calculateBudgetSummary,
+  calculateNoCycleSummary,
   buildActivityRecords,
   categoryColor,
+  calendarWeeklySpendTrend,
   cycleStart,
   dailySpendTrend,
   formatMoney,
+  isNoCycleBudgetActive,
   monthlySpendTrend,
   nextCycleStart,
   reconcileGoalBalances,
@@ -33,6 +36,12 @@ import {
 import type { ActivityRecord } from '@/finance.mjs';
 import { useFinance } from '@/store';
 import { Spacing } from '@/constants/theme';
+
+function formatSignedMoney(minor: number, currency: string) {
+  return minor < 0
+    ? `−${formatMoney(Math.abs(minor), currency)}`
+    : formatMoney(minor, currency);
+}
 
 function ActivityRow({ record, currency }: { record: ActivityRecord; currency: string }) {
   const p = usePalette();
@@ -106,6 +115,15 @@ export default function Dashboard() {
   }, [now]);
   const mode = useThemeMode();
   const onDark = mode === 'dark';
+  const isNoCycleView = isNoCycleBudgetActive(preferences, now);
+  const isMonthlyCycleScheduled =
+    preferences.budgetingMode === 'monthly_cycle' &&
+    isNoCycleView &&
+    preferences.monthlyEffectiveAt !== null;
+  const scheduledMonthlyDate =
+    isMonthlyCycleScheduled && preferences.monthlyEffectiveAt
+      ? new Date(preferences.monthlyEffectiveAt)
+      : null;
 
   const { start, next } = useMemo(() => {
     const s = cycleStart(now, preferences.cycleStartDay);
@@ -113,7 +131,15 @@ export default function Dashboard() {
     return { start: s, next: n };
   }, [now, preferences.cycleStartDay]);
 
-  const spent = useMemo(() => sumExpenses(expenses, start, now), [expenses, start, now]);
+  const rollingStart = useMemo(() => {
+    const date = new Date(now);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - 29);
+    return date;
+  }, [now]);
+  const displayStart = isNoCycleView ? rollingStart : start;
+  const spent = useMemo(() => sumExpenses(expenses, displayStart, now), [expenses, displayStart, now]);
+  const cycleSpent = useMemo(() => sumExpenses(expenses, start, now), [expenses, start, now]);
   const goalBalances = useMemo(() => reconcileGoalBalances(goals, goalTransactions), [goals, goalTransactions]);
   const savingsReservedMinor = useMemo(
     () => Object.values(goalBalances).reduce((total, amount) => total + Number(amount || 0), 0),
@@ -134,16 +160,37 @@ export default function Dashboard() {
         incomes,
         cycleStartDate: start,
         cycleThroughDate: now,
-        expenseMinor: spent,
+        expenseMinor: cycleSpent,
         savingsReservedMinor,
         totalCycleDays,
         daysLeft,
         pacingMode: preferences.pacingMode,
         zeroSpendDays,
       }),
-    [preferences.allowanceMinor, incomes, start, now, spent, savingsReservedMinor, totalCycleDays, daysLeft, preferences.pacingMode, zeroSpendDays]
+    [preferences.allowanceMinor, incomes, start, now, cycleSpent, savingsReservedMinor, totalCycleDays, daysLeft, preferences.pacingMode, zeroSpendDays]
   );
-  const remaining = budgetSummary.availableMinor;
+  const noCycleSummary = useMemo(
+    () =>
+      calculateNoCycleSummary({
+        openingBalanceMinor: preferences.noCycleOpeningBalanceMinor,
+        expensesThroughId: preferences.noCycleExpensesThroughId,
+        incomesThroughId: preferences.noCycleIncomesThroughId,
+        goalTransactionsThroughId: preferences.noCycleGoalTransactionsThroughId,
+        expenses,
+        incomes,
+        goalTransactions,
+      }),
+    [
+      preferences.noCycleOpeningBalanceMinor,
+      preferences.noCycleExpensesThroughId,
+      preferences.noCycleIncomesThroughId,
+      preferences.noCycleGoalTransactionsThroughId,
+      expenses,
+      incomes,
+      goalTransactions,
+    ]
+  );
+  const remaining = isNoCycleView ? noCycleSummary.availableMinor : budgetSummary.availableMinor;
   const hasIncomeTopUp = budgetSummary.incomeTopUpMinor > 0;
   const updatedColor = onDark ? '#74D69E' : '#59CA89';
   const daysElapsed = useMemo(
@@ -151,21 +198,23 @@ export default function Dashboard() {
     [now, start]
   );
 
-  const displayDailyRoom = budgetSummary.dailyRoomMinor;
+  const displayDailyRoom = isNoCycleView ? null : budgetSummary.dailyRoomMinor;
 
-  const dailyPace = Math.round(spent / daysElapsed);
+  const dailyPace = Math.round(spent / (isNoCycleView ? 30 : daysElapsed));
 
   const [granularity, setGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
   const cycleTrend = useMemo(() => {
     if (granularity === 'weekly') {
-      return weeklySpendTrend(expenses, start, now);
+      return isNoCycleView
+        ? calendarWeeklySpendTrend(expenses, displayStart, now)
+        : weeklySpendTrend(expenses, displayStart, now);
     }
     if (granularity === 'monthly') {
-      return monthlySpendTrend(expenses, start, now);
+      return monthlySpendTrend(expenses, displayStart, now);
     }
-    return dailySpendTrend(expenses, start, now);
-  }, [expenses, start, now, granularity]);
+    return dailySpendTrend(expenses, displayStart, now);
+  }, [expenses, displayStart, now, granularity, isNoCycleView]);
 
   const recent = useMemo(
     () => buildActivityRecords({ expenses, incomes, goals: goalRecords, goalTransactions }).slice(0, 3),
@@ -181,7 +230,7 @@ export default function Dashboard() {
   return (
     <AppScaffold>
       <Screen
-        eyebrow="Allowance Cycle"
+        eyebrow={isNoCycleView ? 'No Fixed Cycle' : 'Allowance Cycle'}
         title={preferences.name ? `Hello, ${preferences.name}!` : 'Hello!'}
         action={
           <Pressable
@@ -205,57 +254,109 @@ export default function Dashboard() {
           </Pressable>
         }
       >
-        {/* Main Allowance Hero Card */}
+        {/* Main Balance Hero Card */}
         <Surface style={[styles.heroCard, { backgroundColor: heroBg, borderColor: heroBorder }]}>
           <View style={[ui.row, { justifyContent: 'space-between' }]}>
             <AppText variant="eyebrow" color={heroSub}>
-              AVAILABLE THIS CYCLE
+              {isNoCycleView ? 'CURRENT AVAILABLE BALANCE' : 'AVAILABLE THIS CYCLE'}
             </AppText>
-            <AppText variant="caption" color={heroSub}>
-              Resets {next.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-            </AppText>
+            {!isNoCycleView ? (
+              <AppText variant="caption" color={heroSub}>
+                Resets {next.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </AppText>
+            ) : null}
           </View>
 
           <AppText variant="display" color={heroFg} tabular>
-            {formatMoney(remaining, preferences.currency)}
+            {formatSignedMoney(remaining, preferences.currency)}
           </AppText>
 
-          <ProgressBar
-            value={allowanceProgress(spent, budgetSummary.adjustedCycleBudgetMinor)}
-            color={onDark ? p.accent : '#FFFFFF'}
-            trackColor={onDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.3)'}
-          />
-
-          <View style={[ui.row, { justifyContent: 'space-between' }]}>
-            <AppText variant="captionMedium" color={heroSub} tabular>
-              {formatMoney(spent, preferences.currency)} spent of {formatMoney(budgetSummary.adjustedCycleBudgetMinor, preferences.currency)}
-            </AppText>
-            <AppText variant="captionMedium" color={heroSub}>
-              {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
-            </AppText>
-          </View>
-
-          {hasIncomeTopUp ? (
+          {!isNoCycleView ? (
             <>
-              <View style={styles.heroDivider} />
-              <View style={styles.budgetBreakdown}>
-                <AppText
-                  variant="caption"
-                  color={heroSub}
-                  style={styles.budgetBreakdownLabel}
-                >
-                  Base {formatMoney(budgetSummary.allowanceMinor, preferences.currency)} + Extra{' '}
-                  {formatMoney(budgetSummary.incomeTopUpMinor, preferences.currency)}
+              <ProgressBar
+                value={allowanceProgress(cycleSpent, budgetSummary.adjustedCycleBudgetMinor)}
+                color={onDark ? p.accent : '#FFFFFF'}
+                trackColor={onDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.3)'}
+              />
+
+              <View style={[ui.row, { justifyContent: 'space-between' }]}>
+                <AppText variant="captionMedium" color={heroSub} tabular>
+                  {formatMoney(cycleSpent, preferences.currency)} spent of {formatMoney(budgetSummary.adjustedCycleBudgetMinor, preferences.currency)}
                 </AppText>
-                <View style={[styles.updatedBadge, { borderColor: updatedColor }]}>
-                  <AppText variant="captionMedium" color={updatedColor}>
-                    Updated
-                  </AppText>
-                </View>
+                <AppText variant="captionMedium" color={heroSub}>
+                  {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
+                </AppText>
               </View>
+
+              {hasIncomeTopUp ? (
+                <>
+                  <View style={styles.heroDivider} />
+                  <View style={styles.budgetBreakdown}>
+                    <AppText
+                      variant="caption"
+                      color={heroSub}
+                      style={styles.budgetBreakdownLabel}
+                    >
+                      Base {formatMoney(budgetSummary.allowanceMinor, preferences.currency)} + Extra{' '}
+                      {formatMoney(budgetSummary.incomeTopUpMinor, preferences.currency)}
+                    </AppText>
+                    <View style={[styles.updatedBadge, { borderColor: updatedColor }]}>
+                      <AppText variant="captionMedium" color={updatedColor}>
+                        Updated
+                      </AppText>
+                    </View>
+                  </View>
+                </>
+              ) : null}
             </>
-          ) : null}
+          ) : (
+            <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: heroSub, paddingTop: Spacing.eight, gap: Spacing.four }}>
+              <View style={[ui.row, { justifyContent: 'space-between' }]}>
+                <AppText variant="caption" color={heroSub}>Opening Balance</AppText>
+                <AppText variant="captionMedium" color={heroFg} tabular>
+                  {formatSignedMoney(noCycleSummary.openingBalanceMinor, preferences.currency)}
+                </AppText>
+              </View>
+              <View style={[ui.row, { justifyContent: 'space-between' }]}>
+                <AppText variant="caption" color={heroSub}>Total Income</AppText>
+                <AppText variant="captionMedium" color={heroFg} tabular>
+                  +{formatMoney(noCycleSummary.incomeMinor, preferences.currency)}
+                </AppText>
+              </View>
+              <View style={[ui.row, { justifyContent: 'space-between' }]}>
+                <AppText variant="caption" color={heroSub}>Total Expenses</AppText>
+                <AppText variant="captionMedium" color={heroFg} tabular>
+                  −{formatMoney(noCycleSummary.expenseMinor, preferences.currency)}
+                </AppText>
+              </View>
+              <View style={[ui.row, { justifyContent: 'space-between' }]}>
+                <AppText variant="caption" color={heroSub}>Savings Allocated</AppText>
+                <AppText variant="captionMedium" color={heroFg} tabular>
+                  −{formatMoney(noCycleSummary.savingsAllocatedMinor, preferences.currency)}
+                </AppText>
+              </View>
+              <View style={[ui.row, { justifyContent: 'space-between' }]}>
+                <AppText variant="caption" color={heroSub}>Savings Withdrawals</AppText>
+                <AppText variant="captionMedium" color={heroFg} tabular>
+                  +{formatMoney(noCycleSummary.savingsWithdrawnMinor, preferences.currency)}
+                </AppText>
+              </View>
+            </View>
+          )}
         </Surface>
+
+        {scheduledMonthlyDate ? (
+          <Surface style={{ gap: Spacing.four, backgroundColor: p.accentSoft }}>
+            <AppText variant="bodyMedium" weight="700" color={p.accent}>
+              Monthly Cycle Scheduled
+            </AppText>
+            <AppText variant="caption" color={p.textSecondary}>
+              Your monthly cycle begins on{' '}
+              {scheduledMonthlyDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.
+              {' '}Your current balance remains active until then.
+            </AppText>
+          </Surface>
+        ) : null}
 
         {/* Pace & Room Metrics */}
         <View style={styles.metricRow}>
@@ -265,13 +366,17 @@ export default function Dashboard() {
             accessibilityLabel="Adjust Daily Pacing In Profile"
           >
             <AppText variant="caption" color={p.textSecondary}>
-              {preferences.pacingMode === 'adaptive' ? 'Adaptive Room' : 'Daily Target'}
+              {isNoCycleView
+                ? 'Adaptive Room'
+                : preferences.pacingMode === 'adaptive' ? 'Adaptive Room' : 'Daily Target'}
             </AppText>
             <AppText variant="title" weight="700" tabular>
-              {formatMoney(displayDailyRoom, preferences.currency)}
+              {displayDailyRoom === null ? '—' : formatMoney(displayDailyRoom, preferences.currency)}
             </AppText>
             <AppText variant="caption" color={p.textSecondary}>
-              {preferences.pacingMode === 'adaptive' ? 'with zero-spend rollover' : 'steady benchmark'}
+              {isNoCycleView
+                ? 'Unavailable without a fixed cycle'
+                : preferences.pacingMode === 'adaptive' ? 'with zero-spend rollover' : 'steady benchmark'}
             </AppText>
           </Surface>
 
@@ -283,7 +388,7 @@ export default function Dashboard() {
               {formatMoney(dailyPace, preferences.currency)}
             </AppText>
             <AppText variant="caption" color={p.textSecondary}>
-              spent this cycle
+              {isNoCycleView ? 'past 30 days' : 'spent this cycle'}
             </AppText>
           </Surface>
         </View>
@@ -295,7 +400,7 @@ export default function Dashboard() {
         <View style={{ gap: Spacing.twelve }}>
           <SectionTitle
             title="Spending Trend"
-            detail="Daily spending recorded this cycle"
+            detail={isNoCycleView ? 'Daily spending over the past 30 days' : 'Daily spending recorded this cycle'}
             actionLabel="Insights"
             onPress={() => router.push('/insights')}
           />
@@ -324,7 +429,7 @@ export default function Dashboard() {
                 .filter(
                   (item) =>
                     item.category === category &&
-                    item.occurredAt >= start.toISOString() &&
+                    item.occurredAt >= displayStart.toISOString() &&
                     item.occurredAt <= now.toISOString()
                 )
                 .reduce((total, item) => total + item.amountMinor, 0);

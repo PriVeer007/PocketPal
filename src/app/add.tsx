@@ -59,10 +59,6 @@ export default function AddExpenseScreen() {
         setError('Enter an income amount greater than zero.');
         return;
       }
-      if (!title.trim()) {
-        setError('Add a short description of the income source.');
-        return;
-      }
       if (submitLock.current) return;
       submitLock.current = true;
       setSaving(true);
