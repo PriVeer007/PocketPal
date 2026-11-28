@@ -1,28 +1,64 @@
-import { motion, useReducedMotion } from 'framer-motion';
+import { lazy, Suspense, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowUpRight,
   ChevronDown,
+  Cpu,
   Download,
   ExternalLink,
   MessageSquare,
+  ShieldCheck,
 } from 'lucide-react';
-import { Reveal } from './components/MotionPrimitives';
+import { CurvedGallery3D } from './components/CurvedGallery3D';
+import { IntroLoader } from './components/IntroLoader';
+import { Reveal, ScrollProgressBar } from './components/MotionPrimitives';
 import { Navbar } from './components/Navbar';
+import { PacingCalculator } from './components/PacingCalculator';
+import { ReleaseLab } from './components/ReleaseLab';
+import { SpotlightCard } from './components/SpotlightCard';
 import {
+  CHANGELOG,
   FAQS,
   GENUINE_REVIEWS,
   HIGHLIGHTS,
+  INSTALL_STEPS,
   LINKS,
+  TECH_STACK,
 } from './data/content';
+
+const Hero3DScene = lazy(() =>
+  import('./components/Hero3DScene').then((m) => ({ default: m.Hero3DScene }))
+);
+
+function HeroFallbackCard() {
+  return (
+    <div className="mx-auto max-w-[440px] rounded-2xl border-[6px] border-[#18201c] bg-[#131614] p-2 shadow-[0_24px_60px_-18px_rgba(17,22,19,0.28)]">
+      <img
+        src="./images/screen-today-dark.jpg"
+        alt="PocketPal Today screen in Dark Mode showing ₹19,500.00 available this cycle."
+        width={1024}
+        height={907}
+        fetchPriority="high"
+        className="block h-auto w-full rounded-xl select-none"
+      />
+    </div>
+  );
+}
 
 export default function App() {
   const prefersReduced = useReducedMotion();
+  const [activeInstallStep, setActiveInstallStep] = useState(0);
+  const [activeTechIdx, setActiveTechIdx] = useState(2);
+  const [activeReleaseIdx, setActiveReleaseIdx] = useState(0);
 
-  const heroInitial = prefersReduced ? false : { opacity: 0, y: 14 };
+  const heroInitial = prefersReduced ? false : { opacity: 0, y: 16 };
   const heroAnimate = { opacity: 1, y: 0 };
 
   return (
     <div id="top" className="min-h-screen bg-paper text-ink">
+      <IntroLoader />
+      <ScrollProgressBar />
+
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-forest focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
@@ -33,155 +69,298 @@ export default function App() {
       <Navbar />
 
       <main id="main-content">
-        {/* 1. Focused Hero */}
-        <section className="border-b border-border-subtle py-14 sm:py-20 lg:py-24">
+        {/* 1. Kinetic 3D Hero Stage */}
+        <section className="relative overflow-hidden border-b border-border-subtle bg-[linear-gradient(to_right,#dfe3dc38_1px,transparent_1px),linear-gradient(to_bottom,#dfe3dc38_1px,transparent_1px)] bg-[size:48px_48px] py-20 sm:py-24 lg:py-28">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:px-8">
             <motion.div
               initial={heroInitial}
               animate={heroAnimate}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="lg:col-span-6"
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="min-w-0 lg:col-span-6"
             >
-              <div className="inline-flex items-center gap-2 rounded-md border border-border-subtle bg-surface px-3 py-1 text-xs font-semibold text-forest">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface px-3.5 py-1.5 text-xs font-semibold tracking-wide text-forest shadow-xs">
                 <span className="h-1.5 w-1.5 rounded-full bg-mint" aria-hidden="true" />
-                <span>Android APK · {LINKS.version}</span>
+                <span>Android {LINKS.version} · Flexible Cycles &amp; Offline SQLite</span>
               </div>
 
-              <h1 className="mt-5 text-4xl font-bold tracking-tight text-ink sm:text-5xl lg:leading-[1.08]">
+              <h1 className="mt-6 text-balance text-4xl font-bold tracking-[-0.03em] text-ink sm:text-5xl lg:text-[3.5rem] lg:leading-[1.05]">
                 Track your student allowance,{' '}
                 <span className="font-serif font-normal italic text-forest">
                   privately.
                 </span>
               </h1>
 
-              <p className="mt-5 max-w-lg text-base leading-relaxed text-ink-muted sm:text-lg">
-                Set a monthly cycle, log daily spends in seconds, and build
-                savings goals—stored 100% on your phone in local SQLite with
-                zero bank logins or accounts.
+              <p className="mt-6 max-w-[48ch] text-pretty text-base leading-[1.65] text-ink-muted sm:text-lg">
+                Switch between Monthly Cycle and No Fixed Cycle budgeting, log
+                spends in two taps, and build savings goals—stored 100% on your
+                phone in local SQLite.
               </p>
 
-              <div className="mt-8 flex flex-wrap items-center gap-3.5">
-                <a
+              <div className="mt-9 flex flex-wrap items-center gap-3.5">
+                <motion.a
                   href={LINKS.apkDownload}
-                  className="inline-flex items-center gap-2.5 rounded-lg bg-forest px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#143b31]"
+                  whileHover={prefersReduced ? undefined : { scale: 1.02 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.98 }}
+                  className="inline-flex items-center gap-2.5 rounded-xl bg-forest px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#143b31]"
                 >
                   <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span>Download APK ({LINKS.apkSize})</span>
-                </a>
+                  <span>Download {LINKS.apkName} ({LINKS.apkSize})</span>
+                </motion.a>
                 <a
                   href={LINKS.repo}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle bg-surface px-4 py-3.5 text-sm font-semibold text-ink transition-colors hover:bg-paper-elevated"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-border-subtle bg-surface px-5 py-3.5 text-sm font-semibold text-ink transition-colors hover:bg-paper-elevated"
                 >
                   <span>GitHub Source</span>
                   <ArrowUpRight className="h-4 w-4 text-ink-muted" aria-hidden="true" />
                 </a>
               </div>
 
-              <p className="mt-6 font-mono text-xs text-ink-muted">
-                {LINKS.apkName} · Offline SQLite · CSV &amp; JSON Backup
-              </p>
+              <dl className="mt-10 grid grid-cols-3 gap-4 border-t border-border-subtle pt-6">
+                <div>
+                  <dt className="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+                    Storage
+                  </dt>
+                  <dd className="mt-1 text-sm font-semibold text-ink">
+                    Local SQLite
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+                    Accounts
+                  </dt>
+                  <dd className="mt-1 text-sm font-semibold text-ink">
+                    Zero Bank Links
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+                    Exports
+                  </dt>
+                  <dd className="mt-1 text-sm font-semibold text-ink">
+                    CSV &amp; JSON
+                  </dd>
+                </div>
+              </dl>
             </motion.div>
 
-            {/* Crisp, native-resolution Dark Mode screenshot */}
+            {/* Interactive 3D Artifact */}
             <motion.div
-              initial={prefersReduced ? false : { opacity: 0, y: 18 }}
-              animate={heroAnimate}
-              transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="lg:col-span-6"
+              initial={prefersReduced ? false : { opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.55, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              className="min-w-0 lg:col-span-6"
             >
-              <div className="mx-auto max-w-[440px] rounded-2xl border-[6px] border-[#18201c] bg-[#131614] p-2 shadow-[0_24px_60px_-18px_rgba(17,22,19,0.28)]">
-                <img
-                  src="./images/screen-today-dark.jpg"
-                  alt="PocketPal Today screen in Dark Mode showing ₹19,500.00 available this cycle, Base ₹20,000.00 plus Extra ₹5,000.00, with 7 days left."
-                  width={1024}
-                  height={907}
-                  fetchPriority="high"
-                  decoding="sync"
-                  className="block h-auto w-full rounded-xl select-none"
-                />
-              </div>
+              <Suspense fallback={<HeroFallbackCard />}>
+                <Hero3DScene />
+              </Suspense>
             </motion.div>
           </div>
         </section>
 
-        {/* 2. Four Clean Highlights */}
-        <section id="highlights" className="border-b border-border-subtle bg-surface py-16 sm:py-20">
+        {/* 2. Interactive 3D-Tilt Spotlight Highlights */}
+        <section className="border-b border-border-subtle bg-paper-elevated/45 py-14 sm:py-16">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {HIGHLIGHTS.map((item, idx) => (
-                <Reveal key={item.number} delay={idx * 0.05}>
-                  <span className="font-mono text-xs font-semibold text-forest">
-                    {item.number}
-                  </span>
-                  <h2 className="mt-2.5 text-lg font-semibold tracking-tight text-ink">
-                    {item.title}
-                  </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                    {item.description}
-                  </p>
+                <Reveal key={item.number} delay={idx * 0.05} className="h-full">
+                  <SpotlightCard className="rounded-2xl border border-border-subtle bg-surface p-6">
+                    <span className="font-mono text-xs font-semibold text-forest">
+                      {item.number}
+                    </span>
+                    <h2 className="mt-2.5 text-lg font-semibold tracking-tight text-ink">
+                      {item.title}
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+                      {item.description}
+                    </p>
+                  </SpotlightCard>
                 </Reveal>
               ))}
             </div>
           </div>
         </section>
 
-        {/* 3. Crisp App Previews (Only high-res 460x1024 portrait screens, framed at 264px so they are 1.7x supersampled) */}
-        <section id="previews" className="border-b border-border-subtle py-16 sm:py-24">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <Reveal>
-              <div className="mx-auto max-w-xl text-center">
-                <p className="text-xs font-bold tracking-[0.14em] text-forest uppercase">
-                  Inside PocketPal
-                </p>
-                <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-                  Calm visibility, zero clutter
-                </h2>
-                <p className="mt-3 text-base text-ink-muted">
-                  Notice mindful vs. impulse patterns and track savings targets
-                  without spreadsheets or bank links.
-                </p>
+        {/* 3. Interactive "What's New in v1.4.17" Release Lab */}
+        <ReleaseLab />
+
+        {/* 4. Interactive Adaptive vs Fixed Pacing Calculator */}
+        <PacingCalculator />
+
+        {/* 5. AnimatiCSS-Style Pinned 3D Swirl Scroll Gallery */}
+        <CurvedGallery3D />
+
+        {/* 6. Interactive Android APK Install Stepper + Architecture Inspector */}
+        <section id="install" className="border-b border-border-subtle bg-surface py-16 sm:py-24">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-12 lg:grid-cols-12">
+              <div className="lg:col-span-7">
+                <Reveal>
+                  <p className="text-xs font-bold tracking-[0.14em] text-forest uppercase">
+                    Interactive Install Guide
+                  </p>
+                  <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink">
+                    Install {LINKS.apkName} in 4 steps
+                  </h2>
+                </Reveal>
+
+                <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                  {INSTALL_STEPS.map((item, idx) => {
+                    const isActive = idx === activeInstallStep;
+                    return (
+                      <button
+                        key={item.step}
+                        type="button"
+                        onClick={() => setActiveInstallStep(idx)}
+                        className={`relative rounded-xl border p-5 text-left transition-all ${
+                          isActive
+                            ? 'border-forest bg-mint-soft/45 shadow-xs'
+                            : 'border-border-subtle bg-paper hover:border-forest/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-semibold text-forest">
+                            STEP {item.step}
+                          </span>
+                          {isActive && (
+                            <span className="rounded-md bg-forest px-2 py-0.5 font-mono text-[10px] font-semibold text-white">
+                              ACTIVE
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="mt-2 text-base font-semibold text-ink">
+                          {item.title}
+                        </h3>
+                        <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
+                          {item.detail}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </Reveal>
 
-            <div className="mt-12 grid items-start justify-items-center gap-10 sm:grid-cols-2">
-              <Reveal delay={0.05} className="w-full max-w-[264px]">
-                <div className="overflow-hidden rounded-[2rem] border-[6px] border-[#18201c] bg-[#18201c] shadow-[0_20px_50px_-16px_rgba(17,22,19,0.25)]">
-                  <img
-                    src="./images/screen-insights-behaviour.jpg"
-                    alt="PocketPal Insights Behaviour tab showing Mindful 62% vs Impulse 38% and reflection counts."
-                    width={460}
-                    height={1024}
-                    loading="lazy"
-                    className="block h-auto w-full rounded-[1.55rem] select-none"
-                  />
-                </div>
-                <p className="mt-3 text-center text-xs font-semibold text-ink-muted">
-                  Insights · Spending Reflections
-                </p>
-              </Reveal>
+              <div className="lg:col-span-5">
+                <Reveal delay={0.08} className="rounded-2xl border border-border-subtle bg-paper p-6 sm:p-7">
+                  <div className="flex items-center gap-2 text-forest">
+                    <Cpu className="h-4 w-4" aria-hidden="true" />
+                    <span className="font-mono text-xs font-bold uppercase">
+                      Architecture Inspector
+                    </span>
+                  </div>
+                  <h3 className="mt-2 text-xl font-bold text-ink">
+                    Built for speed &amp; data integrity
+                  </h3>
 
-              <Reveal delay={0.12} className="w-full max-w-[264px]">
-                <div className="overflow-hidden rounded-[2rem] border-[6px] border-[#18201c] bg-[#18201c] shadow-[0_20px_50px_-16px_rgba(17,22,19,0.25)]">
-                  <img
-                    src="./images/screen-goals.jpg"
-                    alt="PocketPal Savings Goals screen showing Wireless headphones at 53% and Emergency cushion at 40%."
-                    width={460}
-                    height={1024}
-                    loading="lazy"
-                    className="block h-auto w-full rounded-[1.55rem] select-none"
-                  />
-                </div>
-                <p className="mt-3 text-center text-xs font-semibold text-ink-muted">
-                  Goals · Savings Targets
-                </p>
-              </Reveal>
+                  <div className="mt-5 divide-y divide-border-subtle text-sm">
+                    {TECH_STACK.map((row, idx) => {
+                      const selected = idx === activeTechIdx;
+                      return (
+                        <button
+                          key={row.label}
+                          type="button"
+                          onClick={() => setActiveTechIdx(idx)}
+                          className={`flex w-full items-center justify-between gap-4 rounded-lg px-2.5 py-3 text-left transition-colors ${
+                            selected ? 'bg-mint-soft/60' : 'hover:bg-surface'
+                          }`}
+                        >
+                          <span className="text-xs text-ink-muted">{row.label}</span>
+                          <span className="text-right text-xs font-semibold text-ink">
+                            {row.value}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-border-subtle bg-surface p-3 text-xs text-ink-muted">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-forest" aria-hidden="true" />
+                    <span>
+                      Insights are informational only—not financial advice.
+                    </span>
+                  </div>
+                </Reveal>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* 4. Genuine Student Feedback */}
+        {/* 7. Interactive Release Changelog Switcher */}
+        <section className="border-b border-border-subtle py-16 sm:py-20">
+          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+            <Reveal>
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                  <p className="text-xs font-bold tracking-[0.14em] text-forest uppercase">
+                    Release History
+                  </p>
+                  <h2 className="mt-2 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+                    Compare Android releases
+                  </h2>
+                </div>
+
+                <div
+                  role="tablist"
+                  aria-label="Release versions"
+                  className="inline-flex rounded-xl border border-border-subtle bg-surface p-1"
+                >
+                  {CHANGELOG.map((rel, idx) => (
+                    <button
+                      key={rel.version}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeReleaseIdx === idx}
+                      onClick={() => setActiveReleaseIdx(idx)}
+                      className={`rounded-lg px-3.5 py-1.5 font-mono text-xs font-semibold transition-colors ${
+                        activeReleaseIdx === idx
+                          ? 'bg-forest text-white'
+                          : 'text-ink-muted hover:text-ink'
+                      }`}
+                    >
+                      {rel.version}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+
+            <div className="mt-8">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={CHANGELOG[activeReleaseIdx].version}
+                  initial={prefersReduced ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={prefersReduced ? undefined : { opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="rounded-2xl border border-border-subtle bg-surface p-6 sm:p-8"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-md bg-mint-soft px-2.5 py-1 font-mono text-xs font-bold text-forest">
+                      {CHANGELOG[activeReleaseIdx].version}
+                    </span>
+                    <span className="font-mono text-xs text-ink-muted">
+                      {CHANGELOG[activeReleaseIdx].date}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-xl font-semibold text-ink">
+                    {CHANGELOG[activeReleaseIdx].title}
+                  </h3>
+                  <ul className="mt-4 space-y-2.5 text-sm leading-relaxed text-ink-muted">
+                    {CHANGELOG[activeReleaseIdx].notes.map((note) => (
+                      <li key={note} className="flex items-start gap-2.5">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-forest" aria-hidden="true" />
+                        <span>{note}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+        </section>
+
+        {/* 8. Genuine Student Feedback (Spotlight Cards) */}
         <section id="reviews" className="border-b border-border-subtle bg-surface py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <Reveal>
@@ -208,25 +387,23 @@ export default function App() {
 
             <div className="mt-8 grid gap-6 md:grid-cols-3">
               {GENUINE_REVIEWS.map((review, idx) => (
-                <Reveal
-                  key={review.id}
-                  delay={idx * 0.05}
-                  className="flex flex-col justify-between rounded-xl border border-border-subtle bg-paper p-6"
-                >
-                  <blockquote className="text-sm leading-relaxed text-ink">
-                    “{review.quote}”
-                  </blockquote>
-                  <div className="mt-5 border-t border-border-subtle pt-3">
-                    <p className="text-sm font-semibold text-ink">{review.author}</p>
-                    <p className="text-xs text-ink-muted">{review.context}</p>
-                  </div>
+                <Reveal key={review.id} delay={idx * 0.05} className="h-full">
+                  <SpotlightCard className="flex flex-col justify-between rounded-xl border border-border-subtle bg-paper p-6">
+                    <blockquote className="text-sm leading-relaxed text-ink">
+                      “{review.quote}”
+                    </blockquote>
+                    <div className="mt-5 border-t border-border-subtle pt-3">
+                      <p className="text-sm font-semibold text-ink">{review.author}</p>
+                      <p className="text-xs text-ink-muted">{review.context}</p>
+                    </div>
+                  </SpotlightCard>
                 </Reveal>
               ))}
             </div>
           </div>
         </section>
 
-        {/* 5. Compact FAQ */}
+        {/* 9. Compact FAQ */}
         <section
           id="faq"
           aria-labelledby="faq-heading"
@@ -258,7 +435,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* 6. Direct APK Download CTA */}
+        {/* 10. Direct APK Download CTA */}
         <section id="download" className="dark-surface bg-forest py-16 text-white sm:py-20">
           <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-8 px-4 sm:px-6 lg:flex-row lg:items-center lg:px-8">
             <div className="max-w-xl">
@@ -275,13 +452,15 @@ export default function App() {
             </div>
 
             <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-              <a
+              <motion.a
                 href={LINKS.apkDownload}
+                whileHover={prefersReduced ? undefined : { scale: 1.03 }}
+                whileTap={prefersReduced ? undefined : { scale: 0.98 }}
                 className="inline-flex items-center gap-2.5 rounded-lg bg-mint px-6 py-3.5 text-sm font-bold text-[#0e1a15] transition-colors hover:bg-[#66c8a3]"
               >
                 <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Download APK</span>
-              </a>
+                <span>Download {LINKS.apkName}</span>
+              </motion.a>
               <a
                 href={LINKS.releasePage}
                 target="_blank"

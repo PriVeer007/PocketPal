@@ -1,12 +1,12 @@
 export const LINKS = {
   repo: 'https://github.com/PriVeer007/PocketPal',
-  releasePage: 'https://github.com/PriVeer007/PocketPal/releases/tag/1.3.16',
+  releasePage: 'https://github.com/PriVeer007/PocketPal/releases/tag/1.4.17',
   apkDownload:
-    'https://github.com/PriVeer007/PocketPal/releases/download/1.3.16/PocketPal_FinalBuild.apk',
+    'https://github.com/PriVeer007/PocketPal/releases/download/1.4.17/POCKETPAL.apk',
   feedbackForm:
     'https://docs.google.com/forms/d/e/1FAIpQLScaCpfu5523qb_Ck7kdXsqP-pq45AMBB8uyY7_C578hS3HqrQ/viewform?usp=dialog',
-  version: 'v1.3.16',
-  apkName: 'PocketPal_FinalBuild.apk',
+  version: 'v1.4.17',
+  apkName: 'POCKETPAL.apk',
   apkSize: '104.3 MB',
 } as const;
 
@@ -16,9 +16,10 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Highlights', href: '#highlights' },
-  { label: 'Previews', href: '#previews' },
-  { label: 'Reviews', href: '#reviews' },
+  { label: "What's New", href: '#whats-new' },
+  { label: 'Pacing Lab', href: '#pacing-lab' },
+  { label: '3D Showcase', href: '#showcase' },
+  { label: 'Install', href: '#install' },
   { label: 'FAQ', href: '#faq' },
 ];
 
@@ -31,27 +32,101 @@ export interface HighlightItem {
 export const HIGHLIGHTS: HighlightItem[] = [
   {
     number: '01',
-    title: 'Adaptive daily pacing',
+    title: 'Monthly or No Fixed Cycle',
     description:
-      'Set a monthly allowance cycle (1st–28th) with Fixed limits or Adaptive zero-spend rollover.',
+      'Switch cleanly between Monthly Cycle and No Fixed Cycle budgeting anytime with balance and history preserved.',
   },
   {
     number: '02',
-    title: 'Fast logging & reflections',
+    title: '5-Second Optional Logging',
     description:
-      'Record expenses and income in seconds, with optional Planned, Needed, or Impulse tags.',
+      'Log expenses and income without mandatory descriptions—blank entries default cleanly to Unspecified Expense or Income.',
   },
   {
     number: '03',
-    title: 'Budgets & savings goals',
+    title: 'Adaptive Pacing & Top-Ups',
     description:
-      'Keep category guardrails in view and fund personal savings targets with full history.',
+      'Zero-spend days roll over into Adaptive Room, and eligible income top-ups reflect immediately across your active cycle.',
   },
   {
     number: '04',
-    title: '100% offline SQLite',
+    title: '100% Offline SQLite',
     description:
-      'No bank logins, no cloud accounts, and no telemetry. Export CSV or JSON backups anytime.',
+      'No bank logins, no cloud accounts, and no telemetry. Export CSV spreadsheets or full JSON backups anytime.',
+  },
+];
+
+export interface InstallStep {
+  step: string;
+  title: string;
+  detail: string;
+}
+
+export const INSTALL_STEPS: InstallStep[] = [
+  {
+    step: '01',
+    title: 'Download POCKETPAL.apk',
+    detail: 'Grab the verified v1.4.17 Android build (104.3 MB) directly from GitHub Releases.',
+  },
+  {
+    step: '02',
+    title: 'Allow APK Install',
+    detail: 'If prompted by Android, enable "Install unknown apps" for your browser.',
+  },
+  {
+    step: '03',
+    title: 'Let Play Protect Scan',
+    detail: 'Allow your device to run its standard security scan—the full source is open on GitHub.',
+  },
+  {
+    step: '04',
+    title: 'Set Currency & Start Offline',
+    detail: 'Pick your currency (INR, USD, EUR, GBP, CAD) and budgeting mode with zero sign-up.',
+  },
+];
+
+export interface TechItem {
+  label: string;
+  value: string;
+}
+
+export const TECH_STACK: TechItem[] = [
+  { label: 'Mobile Framework', value: 'Expo SDK 58 & React Native' },
+  { label: 'Navigation & Types', value: 'Expo Router & TypeScript' },
+  { label: 'Local Persistence', value: 'Expo SQLite (Integer Minor Units)' },
+  { label: 'Charts & Motion', value: 'React Native SVG & Reanimated' },
+  { label: 'Data Portability', value: 'CSV Export & JSON Backup / Restore' },
+  { label: 'Privacy Model', value: 'Zero Cloud Telemetry · Zero Bank Links' },
+];
+
+export interface ChangelogEntry {
+  version: string;
+  date: string;
+  title: string;
+  notes: string[];
+}
+
+export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: 'v1.4.17',
+    date: 'Nov 28, 2026',
+    title: 'Major fixes & flexible cycle modes',
+    notes: [
+      'Improved Monthly Cycle and No Fixed Cycle switching with reversible transitions and preserved history.',
+      'Descriptions are now optional; blank entries default to "Unspecified Expense" / "Unspecified Income".',
+      'Major fixes to income-source handling, persistence, and cycle budget top-ups across all source types.',
+      'Improved balance consistency across Dashboard, Activity, and Insights.',
+    ],
+  },
+  {
+    version: 'v1.3.16',
+    date: 'Initial Release',
+    title: 'Offline Edition',
+    notes: [
+      'Allowance cycles (1st–28th), Adaptive vs. Fixed daily pacing, and optional spending reflections.',
+      'Searchable Activity ledger, Insights donut & calendar heat map, Savings Goals, and Dark Mode.',
+      'On-device SQLite storage with CSV export and JSON backup/restore.',
+    ],
   },
 ];
 
@@ -66,7 +141,7 @@ export const GENUINE_REVIEWS: ReviewItem[] = [
   {
     id: 'walter',
     author: 'Walter Vatsav',
-    context: 'Android v1.3.16 tester',
+    context: 'Android tester · Shared live Today screen',
     quote: 'Broooo — this is good. Imma use it from now on.',
   },
   {
@@ -91,6 +166,11 @@ export interface FaqItem {
 }
 
 export const FAQS: FaqItem[] = [
+  {
+    question: 'What changed in v1.4.17 (POCKETPAL.apk)?',
+    answer:
+      'v1.4.17 improves reversible switching between Monthly Cycle and No Fixed Cycle modes, makes transaction descriptions optional (defaulting to "Unspecified Expense" or "Unspecified Income"), fixes income-source persistence and cycle top-ups, and tightens balance consistency across Dashboard, Activity, and Insights.',
+  },
   {
     question: 'Does PocketPal require a bank login or account?',
     answer:
