@@ -74,18 +74,13 @@ export function remainingAllowance(allowanceMinor, spentMinor) {
 export const CYCLE_BUDGET_TOP_UP_SOURCE = 'Allowance';
 
 function sumCycleIncomeTopUps(incomes, cycleStartDate, cycleThroughDate) {
-  if (
-    !Array.isArray(incomes) ||
-    !incomes.some((income) => income?.source === CYCLE_BUDGET_TOP_UP_SOURCE)
-  ) {
-    return 0;
-  }
+  if (!Array.isArray(incomes) || incomes.length === 0) return 0;
 
   const start = localDateKey(cycleStartDate);
   const through = localDateKey(cycleThroughDate);
   const seenIncomeIds = new Set();
   return incomes.reduce((total, income) => {
-    if (income?.source !== CYCLE_BUDGET_TOP_UP_SOURCE) return total;
+    if (!income) return total;
     const date = localDateKey(income.occurredAt);
     if (date < start || date > through) return total;
     if (Number.isSafeInteger(income.id)) {
@@ -415,7 +410,15 @@ const CATEGORY_COLORS = Object.freeze({
   Subscriptions: '#D18B45',
 });
 
-const PRIMARY_CATEGORY_COLORS = new Set(Object.values(CATEGORY_COLORS));
+const DISTRIBUTION_COLORS = Object.freeze({
+  'Actual Expenditure': '#16805D',
+  'Savings Allocation': '#C026D3',
+});
+
+const PRIMARY_CATEGORY_COLORS = new Set([
+  ...Object.values(CATEGORY_COLORS),
+  ...Object.values(DISTRIBUTION_COLORS),
+]);
 
 function hslToHex(hue, saturation = 68, lightness = 52) {
   const s = saturation / 100;
@@ -440,6 +443,8 @@ function hslToHex(hue, saturation = 68, lightness = 52) {
 export function categoryColor(category) {
   const name = typeof category === 'string' ? category.trim() : '';
   const normalized = name.toLowerCase();
+  const distributionName = Object.keys(DISTRIBUTION_COLORS).find((key) => key.toLowerCase() === normalized);
+  if (distributionName) return DISTRIBUTION_COLORS[distributionName];
   const primaryName = normalized === 'others' ? 'Other' : Object.keys(CATEGORY_COLORS).find((key) => key.toLowerCase() === normalized);
   if (primaryName) return CATEGORY_COLORS[primaryName];
 

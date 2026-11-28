@@ -59,7 +59,7 @@ test('calculates allowance progress and remaining without exceeding bounds', () 
   assert.equal(allowanceProgress(10, 0), 0);
 });
 
-test('builds the cycle budget from base allowance and eligible in-cycle allowance income only', () => {
+test('builds the cycle budget from base allowance and all eligible in-cycle income', () => {
   const cycleStartDate = new Date(2026, 10, 5);
   const cycleThroughDate = new Date(2026, 10, 20);
   const base = calculateBudgetSummary({ allowanceMinor: 10000 });
@@ -69,17 +69,21 @@ test('builds the cycle budget from base allowance and eligible in-cycle allowanc
   const ordinaryIncome = calculateBudgetSummary({
     allowanceMinor: 10000,
     incomes: [{ amountMinor: 5000, source: 'Scholarship', occurredAt: '2026-11-10T12:00:00.000Z' }],
+    cycleStartDate,
+    cycleThroughDate,
   });
-  assert.equal(ordinaryIncome.incomeTopUpMinor, 0);
-  assert.equal(ordinaryIncome.adjustedCycleBudgetMinor, 10000);
+  assert.equal(ordinaryIncome.incomeTopUpMinor, 5000);
+  assert.equal(ordinaryIncome.adjustedCycleBudgetMinor, 15000);
 
   const incomes = [
     { id: 1, amountMinor: 2000, source: 'Allowance', occurredAt: '2026-11-05T12:00:00.000Z' },
     { id: 2, amountMinor: 1000, source: 'Allowance', occurredAt: '2026-11-20T12:00:00.000Z' },
     { id: 3, amountMinor: 5000, source: 'Scholarship', occurredAt: '2026-11-10T12:00:00.000Z' },
     { id: 4, amountMinor: 6000, source: 'Part-time work', occurredAt: '2026-11-12T12:00:00.000Z' },
-    { id: 5, amountMinor: 7000, source: 'Allowance', occurredAt: '2026-11-04T12:00:00.000Z' },
-    { id: 6, amountMinor: 8000, source: 'Allowance', occurredAt: '2026-11-21T12:00:00.000Z' },
+    { id: 5, amountMinor: 1500, source: 'Freelance', occurredAt: '2026-11-15T12:00:00.000Z' },
+    { id: 6, amountMinor: 2500, source: 'Other', occurredAt: '2026-11-16T12:00:00.000Z' },
+    { id: 7, amountMinor: 7000, source: 'Custom source', occurredAt: '2026-11-04T12:00:00.000Z' },
+    { id: 8, amountMinor: 8000, source: 'Custom source', occurredAt: '2026-11-21T12:00:00.000Z' },
   ];
   const summary = calculateBudgetSummary({
     allowanceMinor: 10000,
@@ -89,9 +93,70 @@ test('builds the cycle budget from base allowance and eligible in-cycle allowanc
   });
 
   assert.equal(summary.allowanceMinor, 10000);
-  assert.equal(summary.incomeTopUpMinor, 3000);
-  assert.equal(summary.adjustedCycleBudgetMinor, 13000);
-  assert.equal(summary.availableMinor, 13000);
+  assert.equal(summary.incomeTopUpMinor, 18000);
+  assert.equal(summary.adjustedCycleBudgetMinor, 28000);
+  assert.equal(summary.availableMinor, 28000);
+});
+
+test('includes every built-in and custom income source independently', () => {
+  const sources = ['Allowance', 'Scholarship', 'Part-time work', 'Freelance', 'Other', 'Custom source'];
+  for (const source of sources) {
+    const summary = calculateBudgetSummary({
+      allowanceMinor: 10000,
+      incomes: [{ id: 1, amountMinor: 1250, source, occurredAt: '2026-11-10T12:00:00.000Z' }],
+      cycleStartDate: new Date(2026, 10, 1),
+      cycleThroughDate: new Date(2026, 10, 30),
+    });
+    assert.equal(summary.incomeTopUpMinor, 1250, `${source} should contribute to extra income`);
+    assert.equal(summary.adjustedCycleBudgetMinor, 11250, `${source} should not replace or duplicate the base allowance`);
+  }
+});
+
+test('shows ₹1,500 extra and ₹13,500 available as the five income sources are added', () => {
+  const incomes = [];
+  const entries = [
+    { source: 'Allowance', amountMinor: 20_000 },
+    { source: 'Scholarship', amountMinor: 50_000 },
+    { source: 'Part-time work', amountMinor: 30_000 },
+    { source: 'Freelance', amountMinor: 40_000 },
+    { source: 'Other', amountMinor: 10_000 },
+  ];
+  const cycleStartDate = new Date(2026, 10, 1);
+  const cycleThroughDate = new Date(2026, 10, 28);
+
+  entries.forEach((entry, index) => {
+    incomes.push({
+      ...entry,
+      id: index + 1,
+      title: entry.source,
+      occurredAt: '2026-11-28T12:00:00.000Z',
+    });
+    const summary = calculateBudgetSummary({
+      allowanceMinor: 1_200_000,
+      incomes,
+      cycleStartDate,
+      cycleThroughDate,
+      expenseMinor: 0,
+      savingsReservedMinor: 0,
+    });
+
+    assert.equal(summary.incomeTopUpMinor, entries.slice(0, index + 1).reduce((total, item) => total + item.amountMinor, 0));
+    assert.equal(summary.availableMinor, 1_200_000 + summary.incomeTopUpMinor);
+  });
+
+  const finalSummary = calculateBudgetSummary({
+    allowanceMinor: 1_200_000,
+    incomes,
+    cycleStartDate,
+    cycleThroughDate,
+  });
+  assert.equal(finalSummary.incomeTopUpMinor, 150_000);
+  assert.equal(finalSummary.availableMinor, 1_350_000);
+  assert.equal(
+    `Base ${formatMoney(finalSummary.allowanceMinor, 'INR')} + Extra ${formatMoney(finalSummary.incomeTopUpMinor, 'INR')}`,
+    'Base ₹12,000.00 + Extra ₹1,500.00'
+  );
+  assert.equal(formatMoney(finalSummary.availableMinor, 'INR'), '₹13,500.00');
 });
 
 test('matches the adjusted-cycle dashboard values for the ₹10,000 + ₹1,500 example', () => {
@@ -112,13 +177,13 @@ test('matches the adjusted-cycle dashboard values for the ₹10,000 + ₹1,500 e
   assert.ok(Math.abs(allowanceProgress(summary.expenseMinor, summary.adjustedCycleBudgetMinor) - 0.3514782609) < 0.000000001);
 });
 
-test('counts distinct allowance top-ups once when income rows are duplicated', () => {
+test('counts distinct income transactions once across source types', () => {
   const summary = calculateBudgetSummary({
     allowanceMinor: 1_000_000,
     incomes: [
-      { id: 1, amountMinor: 50_000, source: 'Allowance', occurredAt: '2026-11-20T12:00:00.000Z' },
-      { id: 1, amountMinor: 50_000, source: 'Allowance', occurredAt: '2026-11-20T12:00:00.000Z' },
-      { id: 2, amountMinor: 100_000, source: 'Allowance', occurredAt: '2026-11-21T12:00:00.000Z' },
+      { id: 1, amountMinor: 50_000, source: 'Scholarship', occurredAt: '2026-11-20T12:00:00.000Z' },
+      { id: 1, amountMinor: 50_000, source: 'Scholarship', occurredAt: '2026-11-20T12:00:00.000Z' },
+      { id: 2, amountMinor: 100_000, source: 'Freelance', occurredAt: '2026-11-21T12:00:00.000Z' },
     ],
     cycleStartDate: new Date(2026, 10, 1),
     cycleThroughDate: new Date(2026, 10, 24),
@@ -158,6 +223,28 @@ test('recalculates the cycle budget when an eligible income top-up is edited or 
   const afterEdit = summarize([{ ...topUp, amountMinor: 200_000 }]);
   assert.equal(afterEdit.adjustedCycleBudgetMinor, 1_200_000);
   assert.equal(afterEdit.availableMinor, 795_800);
+
+  const afterSourceEdit = summarize([{ ...topUp, source: 'Freelance' }]);
+  assert.equal(afterSourceEdit.incomeTopUpMinor, 150_000);
+  assert.equal(afterSourceEdit.adjustedCycleBudgetMinor, 1_150_000);
+  assert.equal(afterSourceEdit.availableMinor, 745_800);
+
+  const afterDateEdit = summarize([{ ...topUp, occurredAt: '2026-10-31T12:00:00.000Z' }]);
+  assert.equal(afterDateEdit.incomeTopUpMinor, 0);
+  assert.equal(afterDateEdit.adjustedCycleBudgetMinor, 1_000_000);
+  assert.equal(afterDateEdit.availableMinor, 595_800);
+
+  const withUnchangedSavings = calculateBudgetSummary({
+    allowanceMinor: 1_000_000,
+    incomes: [{ ...topUp, source: 'Freelance' }],
+    cycleStartDate,
+    cycleThroughDate,
+    expenseMinor: 404_200,
+    savingsReservedMinor: 20_000,
+  });
+  assert.equal(withUnchangedSavings.expenseMinor, 404_200);
+  assert.equal(withUnchangedSavings.savingsReservedMinor, 20_000);
+  assert.equal(withUnchangedSavings.availableMinor, 725_800);
 
   const noTopUps = summarize([]);
   assert.equal(noTopUps.adjustedCycleBudgetMinor, 1_000_000);
@@ -587,6 +674,21 @@ test('uses consistent distinct colors for primary and custom categories', () => 
   assert.equal(new Set(['#1DB954', '#9B72CF', '#4285F4', '#F4B942', '#F06C62', '#22A6A1']).has(customColor), false);
 });
 
+test('uses distinct financial distribution colors that do not reuse category colors', () => {
+  const categoryColors = ['Food', 'Social', 'Transport', 'Study', 'Shopping', 'Other']
+    .map((category) => categoryColor(category));
+  const actualExpenditure = categoryColor('Actual Expenditure');
+  const savingsAllocation = categoryColor('Savings Allocation');
+
+  assert.equal(actualExpenditure, '#16805D');
+  assert.equal(savingsAllocation, '#C026D3');
+  assert.notEqual(actualExpenditure, savingsAllocation);
+  assert.equal(categoryColors.includes(actualExpenditure), false);
+  assert.equal(categoryColors.includes(savingsAllocation), false);
+  assert.equal(categoryColor('actual expenditure'), actualExpenditure);
+  assert.equal(categoryColor('savings allocation'), savingsAllocation);
+});
+
 test('calculates adaptive rollover vs fixed daily pacing', () => {
   // Allowance = ₹9,000 (900000 minor), 30 days total
   // Day 1: spent = 0, daysLeft = 30
@@ -624,7 +726,7 @@ test('calculates adaptive rollover vs fixed daily pacing', () => {
 
   const summary = calculateBudgetSummary({
     allowanceMinor: 900000,
-    incomes: [{ amountMinor: 200000, source: 'Allowance', occurredAt: '2026-11-10T12:00:00.000Z' }],
+    incomes: [{ amountMinor: 200000, source: 'Freelance', occurredAt: '2026-11-10T12:00:00.000Z' }],
     cycleStartDate: new Date(2026, 10, 1),
     cycleThroughDate: new Date(2026, 10, 20),
     expenseMinor: 250000,
